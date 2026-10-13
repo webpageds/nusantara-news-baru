@@ -4,15 +4,14 @@
 <meta charset="utf-8">
 <meta name="nn-article-slug" content="cristiano-ronaldo-cetak-gol-ke-981-al-nassr-menang-3-1-dan-rekor-1-000-gol-makin-dekat">
 <meta name="nn-site-root" content="https://nusantaranewsidn.com/">
-<link rel="canonical" href="https://nusantaranewsidn.com/artikel/cristiano-ronaldo-cetak-gol-ke-981-al-nassr-menang-3-1-dan-rekor-1-000-gol-makin-dekat/">
-<meta property="og:image:alt" content="Cristiano Ronaldo Cetak Gol ke-981, Al-Nassr Menang 3-1 dan Rekor 1.000 Gol Makin Dekat"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#102b46">
+<link rel="canonical" href="https://nusantaranewsidn.com/artikel/cristiano-ronaldo-cetak-gol-ke-981-al-nassr-menang-3-1-dan-rekor-1-000-gol-makin-dekat/"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#102b46">
 <meta name="description" content="RIYADH — Cristiano Ronaldo kembali menunjukkan ketajamannya bersama Al-Nassr. Penyerang asal Portugal tersebut mencetak gol ke-981 sepanjang karier profesionalnya saat Al-Nassr mengalahkan Neftchi Fergana dengan skor 3-1 dalam pertandingan AFC Champions League Elite, Senin (12/10/2026).">
 <meta property="og:type" content="article"><meta property="og:site_name" content="NusantaraNews"><meta property="og:locale" content="id_ID">
 <meta property="og:title" content="Cristiano Ronaldo Cetak Gol ke-981, Al-Nassr Menang 3-1 dan Rekor 1.000 Gol Makin Dekat">
 <meta property="og:description" content="RIYADH — Cristiano Ronaldo kembali menunjukkan ketajamannya bersama Al-Nassr. Penyerang asal Portugal tersebut mencetak gol ke-981 sepanjang karier profesionalnya saat Al-Nassr mengalahkan Neftchi Fergana dengan skor 3-1 dalam pertandingan AFC Champions League Elite, Senin (12/10/2026).">
 <meta property="og:url" content="https://nusantaranewsidn.com/artikel/cristiano-ronaldo-cetak-gol-ke-981-al-nassr-menang-3-1-dan-rekor-1-000-gol-makin-dekat/">
 <meta property="og:image" content="https://www.reuters.com/resizer/v2/DQPKDWB3PJODDBZIRFJ6NKVMMQ.jpg?auth=f268a953b7ed36f39232b23d12c2e1d3cac3aba4d68770a81fd0ca3340a9dfaa&amp;width=1080&amp;quality=80">
-<meta property="og:image:alt" content="NusantaraNews — Berita Indonesia">
+<meta property="og:image:alt" content="Cristiano Ronaldo Cetak Gol ke-981, Al-Nassr Menang 3-1 dan Rekor 1.000 Gol Makin Dekat">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Cristiano Ronaldo Cetak Gol ke-981, Al-Nassr Menang 3-1 dan Rekor 1.000 Gol Makin Dekat">
@@ -46,9 +45,9 @@ async function loadWeather(){const cfg=weatherCities[activeWeatherCity]||weather
 const cityPicker=document.getElementById("weatherCity");if(cityPicker)cityPicker.addEventListener("change",()=>{activeWeatherCity=cityPicker.value;tickClock();loadWeather();});loadWeather();
 document.getElementById("year").textContent=new Intl.DateTimeFormat("en",{year:"numeric",timeZone:"Asia/Jakarta"}).format(new Date());
 const params=new URLSearchParams(location.search),slug=params.get("slug")||(document.querySelector('meta[name="nn-article-slug"]')||{}).content||"";
-function articlePath(id,item){return item&&item.sourceSystem==="supabase"?new URL("article.html?slug="+encodeURIComponent(id),new URL("./",location.href)).href:new URL("artikel/"+encodeURIComponent(id)+"/","https://nusantaranewsidn.com/").href;}
+function articlePath(id,item){const rootMeta=document.querySelector('meta[name="nn-site-root"]');const root=rootMeta&&rootMeta.content?rootMeta.content:new URL("./",location.href).href;return new URL("artikel/"+encodeURIComponent(id)+"/",root).href;}
 function safeLink(value){try{const u=new URL(value);return u.protocol==="https:"?u.href:""}catch(e){return ""}}
-function canonicalArticleUrl(a){return a.sourceSystem==="supabase"?new URL("article.html?slug="+encodeURIComponent(a.slug),new URL("./",location.href)).href:"https://nusantaranewsidn.com/artikel/"+encodeURIComponent(a.slug)+"/";}
+function canonicalArticleUrl(a){const rootMeta=document.querySelector('meta[name="nn-site-root"]');const root=rootMeta&&rootMeta.content?rootMeta.content:new URL("./",location.href).href;return new URL("artikel/"+encodeURIComponent(a.slug)+"/",root).href;}
 function text(tag,className,value){const el=document.createElement(tag);if(className)el.className=className;el.textContent=value||"";return el}
 function renderArticle(a,all){
 const main=document.getElementById("pageMain");main.className="article-layout";main.innerHTML="";

@@ -4,15 +4,14 @@
 <meta charset="utf-8">
 <meta name="nn-article-slug" content="indonesia-bidik-tujuh-medali-emas-di-ajang-asian-para-games-2026">
 <meta name="nn-site-root" content="https://nusantaranewsidn.com/">
-<link rel="canonical" href="https://nusantaranewsidn.com/artikel/indonesia-bidik-tujuh-medali-emas-di-ajang-asian-para-games-2026/">
-<meta property="og:image:alt" content="Indonesia Bidik Tujuh Medali Emas di Ajang Asian Para Games 2026"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#102b46">
+<link rel="canonical" href="https://nusantaranewsidn.com/artikel/indonesia-bidik-tujuh-medali-emas-di-ajang-asian-para-games-2026/"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#102b46">
 <meta name="description" content="Berita terbaru kategori Olahraga dari InvestorTrust. Buka tautan sumber untuk membaca laporan lengkap dan konteksnya.">
 <meta property="og:type" content="article"><meta property="og:site_name" content="NusantaraNews"><meta property="og:locale" content="id_ID">
 <meta property="og:title" content="Indonesia Bidik Tujuh Medali Emas di Ajang Asian Para Games 2026">
 <meta property="og:description" content="Berita terbaru kategori Olahraga dari InvestorTrust. Buka tautan sumber untuk membaca laporan lengkap dan konteksnya.">
 <meta property="og:url" content="https://nusantaranewsidn.com/artikel/indonesia-bidik-tujuh-medali-emas-di-ajang-asian-para-games-2026/">
 <meta property="og:image" content="https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&amp;fit=crop&amp;w=1200&amp;q=85&amp;h=630">
-<meta property="og:image:alt" content="NusantaraNews — Berita Indonesia">
+<meta property="og:image:alt" content="Indonesia Bidik Tujuh Medali Emas di Ajang Asian Para Games 2026">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Indonesia Bidik Tujuh Medali Emas di Ajang Asian Para Games 2026">
@@ -46,9 +45,9 @@ async function loadWeather(){const cfg=weatherCities[activeWeatherCity]||weather
 const cityPicker=document.getElementById("weatherCity");if(cityPicker)cityPicker.addEventListener("change",()=>{activeWeatherCity=cityPicker.value;tickClock();loadWeather();});loadWeather();
 document.getElementById("year").textContent=new Intl.DateTimeFormat("en",{year:"numeric",timeZone:"Asia/Jakarta"}).format(new Date());
 const params=new URLSearchParams(location.search),slug=params.get("slug")||(document.querySelector('meta[name="nn-article-slug"]')||{}).content||"";
-function articlePath(id,item){return item&&item.sourceSystem==="supabase"?new URL("article.html?slug="+encodeURIComponent(id),new URL("./",location.href)).href:new URL("artikel/"+encodeURIComponent(id)+"/","https://nusantaranewsidn.com/").href;}
+function articlePath(id,item){const rootMeta=document.querySelector('meta[name="nn-site-root"]');const root=rootMeta&&rootMeta.content?rootMeta.content:new URL("./",location.href).href;return new URL("artikel/"+encodeURIComponent(id)+"/",root).href;}
 function safeLink(value){try{const u=new URL(value);return u.protocol==="https:"?u.href:""}catch(e){return ""}}
-function canonicalArticleUrl(a){return a.sourceSystem==="supabase"?new URL("article.html?slug="+encodeURIComponent(a.slug),new URL("./",location.href)).href:"https://nusantaranewsidn.com/artikel/"+encodeURIComponent(a.slug)+"/";}
+function canonicalArticleUrl(a){const rootMeta=document.querySelector('meta[name="nn-site-root"]');const root=rootMeta&&rootMeta.content?rootMeta.content:new URL("./",location.href).href;return new URL("artikel/"+encodeURIComponent(a.slug)+"/",root).href;}
 function text(tag,className,value){const el=document.createElement(tag);if(className)el.className=className;el.textContent=value||"";return el}
 function renderArticle(a,all){
 const main=document.getElementById("pageMain");main.className="article-layout";main.innerHTML="";
