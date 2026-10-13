@@ -1,8 +1,4 @@
-// Konfigurasi publik Supabase untuk Ruang Redaksi NusantaraNews.
-// Isi dengan Project URL dan anon/publishable key dari Supabase Dashboard > Project Settings > API.
-// Aman untuk frontend HANYA jika Row Level Security dan policies pada supabase/schema.sql sudah aktif.
-// JANGAN pernah memasukkan service_role key atau password database ke file ini.
 window.NN_SUPABASE_CONFIG = {
-  url: "https://YOUR-PROJECT.supabase.co",
-  anonKey: "YOUR-ANON-OR-PUBLISHABLE-KEY"
+  url: "https://xlenjofqukddoqntioep.supabase.co",
+  anonKey: "sb_publishable_m_-HF4OLNgyuN-L0obaI4w_X7tF_vVR"
 };
