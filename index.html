@@ -38,7 +38,7 @@
     </div>
     <nav aria-label="Navigasi utama"><div class="wrap" id="navCats"><a class="active" href="#terbaru" data-category="Semua">Beranda</a><a href="#terbaru" data-category="Nasional">Nasional</a><a href="#terbaru" data-category="Daerah">Daerah</a><a href="#terbaru" data-category="Politik">Politik</a><a href="#terbaru" data-category="Ekonomi">Ekonomi</a><a href="#terbaru" data-category="Teknologi">Teknologi</a><a href="#terbaru" data-category="Olahraga">Olahraga</a><a href="#terbaru" data-category="Lifestyle">Lifestyle</a></div></nav>
   </header>
-  <section class="market" aria-label="Informasi pasar"><div class="wrap"><span class="market-label">PASAR HARI INI</span><div class="market-text"><strong>IHSG / IDX COMPOSITE</strong> Data pasar tersedia melalui widget eksternal saat konfigurasi ticker diaktifkan. <a href="https://www.tradingview.com/symbols/IDX-COMPOSITE/" target="_blank" rel="noopener" style="color:#1e5b91;font-weight:700">Lihat indeks ↗</a></div></div></section>
+  <section class="market" aria-label="Informasi pasar"><div class="wrap"><span class="market-label">PASAR HARI INI</span><div class="market-text"><strong>Indeks saham dan pergerakan pasar</strong></div></div></section><section style="border-bottom:1px solid var(--line);padding:5px 0"><div class="wrap"><tv-ticker-tape symbols="IDX:COMPOSITE,IDX:BBCA,IDX:BBRI,IDX:BMRI,IDX:TLKM" hide-chart item-size="compact"></tv-ticker-tape></div></section>
   <section class="breaking"><div class="wrap"><span class="breaking-label">KILAS BERITA</span><div class="ticker-window"><div class="ticker-track" id="ticker"><span>Informasi terkini dari Indonesia dan dunia</span><span>Ikuti perkembangan nasional, ekonomi, dan teknologi</span><span>Informasi terkini dari Indonesia dan dunia</span><span>Ikuti perkembangan nasional, ekonomi, dan teknologi</span></div></div></div></section>
   <main class="wrap">
     <div class="hero-grid">
@@ -48,9 +48,10 @@
     <section id="terbaru"><div class="section-head"><div><div class="section-kicker">Update terkini</div><h2 id="sectionTitle">Berita Terbaru</h2><p>Informasi pilihan dari berbagai kategori.</p></div><a href="#terbaru" id="clearFilter">LIHAT SEMUA ↗</a></div><div class="news-grid" id="newsGrid"></div><div class="empty" id="emptyState">Belum ada berita yang cocok. Coba kata kunci atau kategori lain.</div><p class="notice">Catatan: artikel di tampilan awal ini merupakan konten contoh/desain. Verifikasi setiap fakta dan sumber sebelum menerbitkan berita.</p></section>
     <section class="newsletter"><div><h2>Dapatkan kabar yang penting.</h2><p>Ikuti perkembangan Indonesia dengan membaca berita terbaru NusantaraNews.</p></div><a href="#terbaru">BACA BERITA TERBARU&nbsp; →</a></section>
   </main>
+  <script type="module" src="https://widgets.tradingview-widget.com/w/en/tv-ticker-tape.js"></script>
   <footer><div class="wrap"><div class="footer-main"><div><a href="./" class="footer-brand">Nusantara<span>News</span></a><div class="footer-note">Portal berita digital yang menyajikan kabar nasional, daerah, ekonomi, politik, teknologi, olahraga, dan gaya hidup. Utamakan verifikasi dan sumber yang jelas.</div></div><div class="footer-links"><a href="#terbaru">Berita Terbaru</a><a href="#terbaru">Tentang Kami</a><a href="mailto:redaksi@nusantaranews.id">Kontak Redaksi</a></div></div><div class="copyright"><span>© <span id="year"></span> NusantaraNews. Semua hak dilindungi.</span><span>Konten contoh harus diverifikasi sebelum publikasi.</span></div></div></footer>
   <script>
-    const demoArticles = [
+    let demoArticles = [
       {category:"Nasional",title:"Pemerintah Dorong Penguatan Layanan Publik dan Transformasi Digital",excerpt:"Transformasi layanan publik terus menjadi perhatian untuk meningkatkan akses, kualitas pelayanan, dan transparansi bagi masyarakat.",author:"Redaksi NusantaraNews",date:"13 Okt 2026",image:"https://images.unsplash.com/photo-1529101091764-c3526daf38fe?auto=format&fit=crop&w=900&q=80"},
       {category:"Ekonomi",title:"Pelaku Usaha Menyoroti Peluang Pertumbuhan Ekonomi Digital",excerpt:"Ekosistem digital membuka peluang baru bagi usaha kecil dan menengah, seiring perubahan perilaku konsumen dan perkembangan teknologi.",author:"Tim Ekonomi",date:"13 Okt 2026",image:"https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=900&q=80"},
       {category:"Teknologi",title:"Inovasi Teknologi Mendorong Cara Baru Masyarakat Bekerja",excerpt:"Perkembangan teknologi menghadirkan efisiensi baru sekaligus kebutuhan terhadap literasi digital dan keamanan data.",author:"Tim Teknologi",date:"12 Okt 2026",image:"https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=900&q=80"},
@@ -58,19 +59,35 @@
       {category:"Politik",title:"Transparansi Kebijakan Publik Jadi Sorotan dalam Tata Kelola",excerpt:"Keterbukaan informasi dan partisipasi masyarakat berperan dalam mendorong proses kebijakan yang akuntabel.",author:"Tim Nasional",date:"12 Okt 2026",image:"https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=900&q=80"},
       {category:"Olahraga",title:"Pembinaan Atlet Muda Perlu Didukung Fasilitas dan Kompetisi",excerpt:"Pembibitan atlet dan dukungan ekosistem olahraga menjadi bagian penting dari upaya meningkatkan prestasi secara berkelanjutan.",author:"Tim Olahraga",date:"11 Okt 2026",image:"https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=900&q=80"}
     ];
+    async function loadCmsArticles(){
+      try {
+        const response = await fetch("./data/news.json?updated=" + Date.now(), {cache:"no-store"});
+        if (!response.ok) throw new Error("Data berita belum dapat dimuat");
+        const records = await response.json();
+        if (!Array.isArray(records)) throw new Error("Format data tidak sesuai");
+        const published = records.filter(item => item && item.status === "Published" && item.title && item.excerpt).map(item => {
+          const rawDate = item.date || "";
+          let displayDate = rawDate;
+          if (rawDate && !Number.isNaN(Date.parse(rawDate))) displayDate = new Intl.DateTimeFormat("id-ID",{day:"numeric",month:"short",year:"numeric"}).format(new Date(rawDate + "T12:00:00"));
+          return {category:item.category || "Nasional",title:item.title,excerpt:item.excerpt,author:item.author || "Redaksi NusantaraNews",date:displayDate,image:item.image || "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=900&q=80",body:item.body || item.excerpt};
+        });
+        if (published.length) { demoArticles = published; renderPicks(); render(); }
+      } catch (error) { console.info("Memakai berita demo sementara:", error.message); }
+    }
     const categoryColors = {Nasional:"#d73535",Daerah:"#237b75",Politik:"#7452a3",Ekonomi:"#176b85",Teknologi:"#355fbd",Olahraga:"#298252",Lifestyle:"#b36b25"};
     const editorPicks = document.getElementById("editorPicks");
     const newsGrid = document.getElementById("newsGrid");
     const input = document.getElementById("searchInput");
     let activeCategory = "Semua";
+    let visibleArticles = [];
     function safeText(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
     function cardMarkup(a,i){return '<article class="news-card" data-category="'+safeText(a.category)+'" data-search="'+safeText((a.title+" "+a.excerpt+" "+a.category).toLowerCase())+'"><div class="card-image" style="background-image:url(&quot;'+safeText(a.image)+'&quot;)"><span class="pill" style="background:'+(categoryColors[a.category]||"#d73535")+'">'+safeText(a.category)+'</span></div><div class="card-body"><h3>'+safeText(a.title)+'</h3><p>'+safeText(a.excerpt)+'</p><div class="small-meta"><span>'+safeText(a.author)+'</span><span>'+safeText(a.date)+'</span></div></div></article>'}
-    function render(){const q=input.value.trim().toLowerCase();const filtered=demoArticles.filter(a=>(activeCategory==="Semua"||a.category===activeCategory)&&(!q||(a.title+" "+a.excerpt+" "+a.category).toLowerCase().includes(q)));newsGrid.innerHTML=filtered.map(cardMarkup).join("");document.getElementById("emptyState").style.display=filtered.length?"none":"block";document.getElementById("sectionTitle").textContent=activeCategory==="Semua"?"Berita Terbaru":"Berita "+activeCategory;}
+    function render(){const q=input.value.trim().toLowerCase();visibleArticles=demoArticles.filter(a=>(activeCategory==="Semua"||a.category===activeCategory)&&(!q||(a.title+" "+a.excerpt+" "+a.category).toLowerCase().includes(q)));newsGrid.innerHTML=visibleArticles.map(cardMarkup).join("");document.getElementById("emptyState").style.display=visibleArticles.length?"none":"block";document.getElementById("sectionTitle").textContent=activeCategory==="Semua"?"Berita Terbaru":"Berita "+activeCategory;}
     function renderPicks(){editorPicks.innerHTML=demoArticles.slice(0,3).map(a=>'<article class="side-story"><div class="thumb" style="background-image:url(&quot;'+safeText(a.image)+'&quot;)"></div><div><div class="story-category">'+safeText(a.category)+'</div><h3>'+safeText(a.title)+'</h3><div class="small-meta">'+safeText(a.date)+'</div></div></article>').join("");document.getElementById("ticker").innerHTML=[...demoArticles,...demoArticles].map(a=>'<span>'+safeText(a.title)+'</span>').join("");}
     document.getElementById("navCats").addEventListener("click",e=>{const a=e.target.closest("a[data-category]");if(!a)return;e.preventDefault();activeCategory=a.dataset.category;document.querySelectorAll("#navCats a").forEach(x=>x.classList.toggle("active",x===a));render();document.getElementById("terbaru").scrollIntoView({behavior:"smooth"});});
     document.getElementById("searchForm").addEventListener("submit",e=>{e.preventDefault();render();document.getElementById("terbaru").scrollIntoView({behavior:"smooth"});});
     input.addEventListener("input",render);document.getElementById("clearFilter").addEventListener("click",e=>{e.preventDefault();activeCategory="Semua";input.value="";document.querySelectorAll("#navCats a").forEach(x=>x.classList.toggle("active",x.dataset.category==="Semua"));render();});
-    const now=new Date();document.getElementById("today").textContent=new Intl.DateTimeFormat("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"}).format(now);document.getElementById("year").textContent=now.getFullYear();renderPicks();render();
+    const now=new Date();document.getElementById("today").textContent=new Intl.DateTimeFormat("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"}).format(now);document.getElementById("year").textContent=now.getFullYear();renderPicks();render();loadCmsArticles();
   </script>
 </body>
 </html>
