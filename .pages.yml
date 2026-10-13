@@ -1,0 +1,72 @@
+media:
+  input: media
+  output: /media
+
+content:
+  - name: news
+    label: Berita
+    type: file
+    path: data/news.json
+    format: json
+    list: true
+    view:
+      primary: title
+    fields:
+      - name: title
+        label: Judul berita
+        type: string
+        required: true
+        options:
+          maxlength: 140
+      - name: category
+        label: Kategori
+        type: select
+        required: true
+        options:
+          values:
+            - name: Nasional
+              label: Nasional
+            - name: Daerah
+              label: Daerah
+            - name: Politik
+              label: Politik
+            - name: Ekonomi
+              label: Ekonomi
+            - name: Teknologi
+              label: Teknologi
+            - name: Olahraga
+              label: Olahraga
+            - name: Lifestyle
+              label: Lifestyle
+      - name: excerpt
+        label: Ringkasan
+        type: text
+        required: true
+        options:
+          maxlength: 280
+      - name: author
+        label: Penulis
+        type: string
+        required: true
+      - name: date
+        label: Tanggal publikasi
+        type: date
+        required: true
+      - name: image
+        label: URL gambar
+        type: string
+        description: Tempel URL gambar yang boleh digunakan untuk publikasi.
+      - name: body
+        label: Isi berita
+        type: text
+        required: true
+      - name: status
+        label: Status publikasi
+        type: select
+        required: true
+        options:
+          values:
+            - name: Draft
+              label: Draft
+            - name: Published
+              label: Terbit
