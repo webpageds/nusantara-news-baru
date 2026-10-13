@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 162" role="img" aria-labelledby="logoTitle logoDesc">
+  <title id="logoTitle">NusantaraNews</title>
+  <desc id="logoDesc">Aktual, berimbang, mencerdaskan, menginspirasi.</desc>
+  <rect width="1000" height="162" fill="#ffffff"/>
+  <rect x="0" y="3" width="112" height="108" fill="#102b46"/>
+  <text x="11" y="88" font-family="Georgia, 'Times New Roman', serif" font-size="88" font-weight="bold" fill="#ffffff">N</text>
+  <circle cx="73" cy="86" r="15" fill="#cf1f2b"/>
+  <rect x="125" y="0" width="2" height="113" fill="#aeb4bc"/>
+  <text x="147" y="83" font-family="Georgia, 'Times New Roman', serif" font-size="83" font-weight="bold" letter-spacing="-3" fill="#102b46">Nusantara</text>
+  <text x="648" y="83" font-family="Georgia, 'Times New Roman', serif" font-size="83" font-weight="bold" letter-spacing="-3" fill="#c81725">News</text>
+  <path d="M147 123 H198 M810 123 H855" stroke="#6f7782" stroke-width="1.5"/>
+  <text x="212" y="130" font-family="Arial, Helvetica, sans-serif" font-size="16" letter-spacing="4.5" fill="#102b46">AKTUAL</text>
+  <circle cx="291" cy="124" r="3.5" fill="#cf1f2b"/>
+  <text x="310" y="130" font-family="Arial, Helvetica, sans-serif" font-size="16" letter-spacing="4.5" fill="#102b46">BERIMBANG</text>
+  <circle cx="437" cy="124" r="3.5" fill="#cf1f2b"/>
+  <text x="456" y="130" font-family="Arial, Helvetica, sans-serif" font-size="16" letter-spacing="3.3" fill="#102b46">MENCERDASKAN</text>
+  <circle cx="650" cy="124" r="3.5" fill="#cf1f2b"/>
+  <text x="669" y="130" font-family="Arial, Helvetica, sans-serif" font-size="16" letter-spacing="3.2" fill="#102b46">MENGINSPIRASI</text>
+</svg>
