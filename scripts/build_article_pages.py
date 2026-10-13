@@ -1,0 +1,85 @@
+#!/usr/bin/env python3
+"""Generate one crawlable article page per story with static social metadata."""
+from __future__ import annotations
+
+import datetime as dt
+import html
+import json
+import os
+import re
+from pathlib import Path
+from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
+
+ROOT = Path(__file__).resolve().parents[1]
+NEWS_PATH = ROOT / "data" / "news.json"
+TEMPLATE_PATH = ROOT / "article.html"
+SITE_URL = os.environ.get("SITE_URL", "https://webpageds.github.io/nusantara-news-baru").rstrip("/")
+SITEMAP_PATH = ROOT / "sitemap.xml"
+
+def attr(value: str) -> str:
+    return html.escape(str(value or ""), quote=True)
+
+def share_image(url: str) -> str:
+    if not url.startswith("https://"):
+        return SITE_URL + "/assets/nusantaranews-share.svg"
+    try:
+        parts = urlsplit(url)
+        if "images.unsplash.com" in parts.netloc:
+            query = parse_qs(parts.query)
+            query.update({"fit": ["crop"], "w": ["1200"], "h": ["630"], "q": ["85"]})
+            return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query, doseq=True), ""))
+    except Exception:
+        pass
+    return url
+
+def make_page(template: str, article: dict) -> str:
+    slug = article.get("slug", "")
+    title = article.get("title", "NusantaraNews")
+    description = article.get("excerpt") or title
+    image = share_image(article.get("image", ""))
+    canonical = f"{SITE_URL}/artikel/{slug}/"
+    slug_meta = f'<meta name="nn-article-slug" content="{attr(slug)}">'
+    if 'name="nn-article-slug"' not in template:
+        template = template.replace('<meta charset="utf-8">', '<meta charset="utf-8">\n' + slug_meta, 1)
+    template = re.sub(r'<meta name="description" content="[^"]*">', f'<meta name="description" content="{attr(description)}">', template, count=1)
+    template = re.sub(r'<meta property="og:title" content="[^"]*">', f'<meta property="og:title" content="{attr(title)}">', template, count=1)
+    template = re.sub(r'<meta property="og:description" content="[^"]*">', f'<meta property="og:description" content="{attr(description)}">', template, count=1)
+    template = re.sub(r'<meta property="og:url" content="[^"]*">', f'<meta property="og:url" content="{attr(canonical)}">', template, count=1)
+    template = re.sub(r'<meta property="og:image" content="[^"]*">', f'<meta property="og:image" content="{attr(image)}">', template, count=1)
+    template = re.sub(r'<meta property="og:image:width" content="[^"]*">', '<meta property="og:image:width" content="1200">', template, count=1)
+    template = re.sub(r'<meta property="og:image:height" content="[^"]*">', '<meta property="og:image:height" content="630">', template, count=1)
+    template = re.sub(r'<meta name="twitter:title" content="[^"]*">', f'<meta name="twitter:title" content="{attr(title)}">', template, count=1)
+    template = re.sub(r'<meta name="twitter:description" content="[^"]*">', f'<meta name="twitter:description" content="{attr(description)}">', template, count=1)
+    template = re.sub(r'<meta name="twitter:image" content="[^"]*">', f'<meta name="twitter:image" content="{attr(image)}">', template, count=1)
+    template = re.sub(r'<title>.*?</title>', f'<title>{html.escape(title)} | NusantaraNews</title>', template, count=1)
+    template = template.replace('href="./?category=', 'href="../../?category=')
+    template = template.replace('href="./"', 'href="../../"')
+    template = template.replace('src="assets/', 'src="../../assets/')
+    template = template.replace('href="assets/', 'href="../../assets/')
+    template = template.replace('fetch("./data/news.json"', 'fetch("../../data/news.json"')
+    return template
+
+def main() -> int:
+    rows = json.loads(NEWS_PATH.read_text(encoding="utf-8"))
+    template = TEMPLATE_PATH.read_text(encoding="utf-8")
+    urls = [f"{SITE_URL}/"]
+    generated = 0
+    for article in rows:
+        if article.get("status") != "Published" or not article.get("slug"):
+            continue
+        folder = ROOT / "artikel" / article["slug"]
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / "index.html").write_text(make_page(template, article), encoding="utf-8")
+        urls.append(f"{SITE_URL}/artikel/{article['slug']}/")
+        generated += 1
+    stamp = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    url_xml = "\n".join(
+        f"  <url><loc>{html.escape(url)}</loc><lastmod>{stamp}</lastmod><changefreq>{'daily' if url == SITE_URL + '/' else 'weekly'}</changefreq><priority>{'1.0' if url == SITE_URL + '/' else '0.8'}</priority></url>"
+        for url in urls
+    )
+    SITEMAP_PATH.write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + url_xml + '\n</urlset>\n', encoding="utf-8")
+    print(f"Generated {generated} pages; refreshed sitemap.xml.")
+    return 0
+
+if __name__ == "__main__":
+    raise SystemExit(main())
