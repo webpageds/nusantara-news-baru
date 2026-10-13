@@ -39,7 +39,7 @@ def make_page(template: str, article: dict) -> str:
     image = share_image(article.get("image", ""))
     canonical = f"{SITE_URL}/artikel/{slug}/"
     slug_meta = f'<meta name="nn-article-slug" content="{attr(slug)}">'
-    if 'name="nn-article-slug"' not in template:
+    if '<meta name="nn-article-slug"' not in template:
         template = template.replace('<meta charset="utf-8">', '<meta charset="utf-8">\n' + slug_meta, 1)
     template = re.sub(r'<meta name="description" content="[^"]*">', f'<meta name="description" content="{attr(description)}">', template, count=1)
     template = re.sub(r'<meta property="og:title" content="[^"]*">', f'<meta property="og:title" content="{attr(title)}">', template, count=1)
