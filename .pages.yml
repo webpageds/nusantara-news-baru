@@ -42,6 +42,8 @@ content:
               label: Teknologi
             - name: Olahraga
               label: Olahraga
+            - name: Lifestyle
+              label: Lifestyle
       - name: excerpt
         label: Ringkasan
         type: text
