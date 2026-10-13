@@ -7,7 +7,6 @@ on:
   push:
     paths:
       - "article.html"
-      - "data/news.json"
       - "scripts/update_news.py"
       - "scripts/build_article_pages.py"
 
