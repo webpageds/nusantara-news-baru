@@ -31,18 +31,43 @@ FEEDS = {
     "Sosial": "sosial masyarakat bantuan Indonesia when:1d",
     "Lifestyle": "gaya hidup budaya kesehatan Indonesia when:1d",
 }
-FALLBACK_IMAGES = {
-    "Nasional": "https://images.unsplash.com/photo-1529101091764-c3526daf38fe?auto=format&fit=crop&w=1400&q=85",
-    "Daerah": "https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=1400&q=85",
-    "Ekonomi": "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1400&q=85",
-    "Internasional": "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1400&q=85",
-    "Politik": "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=1400&q=85",
-    "Teknologi": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1400&q=85",
-    "Olahraga": "https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=1400&q=85",
-    "Pendidikan": "https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1400&q=85",
-    "Sosial": "https://images.unsplash.com/photo-1593113598332-cd288d649433?auto=format&fit=crop&w=1400&q=85",
-    "Lifestyle": "https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1400&q=85",
-}
+FALLBACK_IMAGES = [
+    "https://images.unsplash.com/photo-1593113598332-cd288d649433?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1529101091764-c3526daf38fe?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1510511459019-5dead6b5f1b9?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1538805060514-97d9cc17730c?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1529390079861-591de354faf5?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1566127992631-137a642a90f4?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1521791136064-7986c2920216?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1516467508483-a7212febe31a?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1400&q=85",
+    "https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1400&q=85",
+]
+
+def choose_fallback_image(slug: str, used_images: set[str]) -> str:
+    start = sum(slug.encode("utf-8")) % len(FALLBACK_IMAGES)
+    for offset in range(len(FALLBACK_IMAGES)):
+        candidate = FALLBACK_IMAGES[(start + offset) % len(FALLBACK_IMAGES)]
+        if candidate not in used_images:
+            return candidate
+    return FALLBACK_IMAGES[start]
 
 def clean_text(value: str) -> str:
     value = re.sub(r"<(script|style)\b[^>]*>.*?</\1>", " ", value or "", flags=re.I | re.S)
@@ -93,6 +118,7 @@ def main() -> int:
     known_titles = {re.sub(r"\W+", " ", str(a.get("title", "")).lower()).strip() for a in rows}
     known_slugs = {a.get("slug") for a in rows}
     candidates: list[dict] = []
+    used_fallback_images: set[str] = set()
     now = dt.datetime.now(TZ)
 
     for category, query in FEEDS.items():
@@ -133,6 +159,9 @@ def main() -> int:
             known_slugs.add(slug)
             image = item_image(item)
             caption = f"Gambar ilustrasi kategori {category}; bukan foto langsung peristiwa." if not image else "Gambar dari feed sumber; periksa keterangan sumber untuk konteks foto."
+            fallback_image = choose_fallback_image(slug, used_fallback_images) if image is None else None
+            if fallback_image:
+                used_fallback_images.add(fallback_image)
             candidates.append({
                 "slug": slug,
                 "title": raw_title[:140],
@@ -141,7 +170,7 @@ def main() -> int:
                 "author": "Feed Redaksi",
                 "date": published.strftime("%Y-%m-%d"),
                 "time": published.strftime("%H.%M WIB"),
-                "image": image or FALLBACK_IMAGES[category],
+                "image": image or fallback_image,
                 "caption": caption,
                 "body": (description if len(description) >= 45 else excerpt) + "\n\nSorotan ini diimpor otomatis dari feed berita publik dan belum melalui verifikasi redaksional manual. Buka tautan sumber untuk laporan lengkap, konteks, dan pembaruan terbaru.",
                 "sourceName": source_name or "Google News RSS",
