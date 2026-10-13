@@ -9,6 +9,7 @@ import os
 import re
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
+from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 NEWS_PATH = ROOT / "data" / "news.json"
@@ -32,6 +33,64 @@ def share_image(url: str) -> str:
     except Exception:
         pass
     return url
+
+def fetch_supabase_articles() -> list[dict]:
+    """Fetch only rows allowed by Supabase public SELECT/RLS for published articles."""
+    config_path = ROOT / "admin" / "config.js"
+    if not config_path.exists():
+        print("[info] Supabase config not found; generating static feed articles only.")
+        return []
+
+    config = config_path.read_text(encoding="utf-8")
+    url_match = re.search(r'url\s*:\s*["\']([^"\']+)["\']', config)
+    key_match = re.search(r'anonKey\s*:\s*["\']([^"\']+)["\']', config)
+    if not url_match or not key_match:
+        print("[info] Supabase public config incomplete; generating static feed articles only.")
+        return []
+
+    project_url = url_match.group(1).rstrip("/")
+    publishable_key = key_match.group(1)
+    endpoint = project_url + "/rest/v1/articles?select=*&status=eq.published&order=published_at.desc"
+    request = Request(endpoint, headers={
+        "apikey": publishable_key,
+        "Authorization": "Bearer " + publishable_key,
+        "Accept": "application/json",
+        "User-Agent": "NusantaraNewsSocialPreviewBuilder/1.0",
+    })
+    try:
+        with urlopen(request, timeout=15) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        if not isinstance(payload, list):
+            raise ValueError("Supabase did not return a list")
+    except Exception as exc:
+        print(f"[warn] Supabase article fetch failed; static feed pages will still be generated: {exc}")
+        return []
+
+    articles = []
+    for row in payload:
+        slug = str(row.get("slug") or "").strip()
+        if not slug or row.get("status") != "published":
+            continue
+        stamp = str(row.get("published_at") or row.get("created_at") or "")
+        articles.append({
+            "slug": slug,
+            "title": row.get("title") or "NusantaraNews",
+            "category": row.get("category") or "Nasional",
+            "excerpt": row.get("excerpt") or row.get("summary") or row.get("description") or "",
+            "body": row.get("body") or row.get("content") or row.get("summary") or "",
+            "author": row.get("author_name") or row.get("author") or "Redaksi NusantaraNews",
+            "date": stamp[:10],
+            "time": "",
+            "image": row.get("image_url") or row.get("image") or "",
+            "caption": row.get("image_caption") or row.get("caption") or "",
+            "sourceName": row.get("source_name") or row.get("sourceName") or "",
+            "sourceUrl": row.get("source_url") or row.get("sourceUrl") or "",
+            "status": "Published",
+            "sourceSystem": "supabase",
+        })
+    print(f"Fetched {len(articles)} published Supabase articles for share previews.")
+    return articles
+
 
 def make_page(template: str, article: dict) -> str:
     slug = article.get("slug", "")
@@ -64,7 +123,16 @@ def make_page(template: str, article: dict) -> str:
     return template
 
 def main() -> int:
-    rows = json.loads(NEWS_PATH.read_text(encoding="utf-8"))
+    feed_rows = json.loads(NEWS_PATH.read_text(encoding="utf-8"))
+    supabase_rows = fetch_supabase_articles()
+    # Prefer the live Supabase row when a slug appears in both sources.
+    by_slug = {
+        str(article.get("slug")): article
+        for article in feed_rows
+        if article.get("status") == "Published" and article.get("slug")
+    }
+    by_slug.update({str(article["slug"]): article for article in supabase_rows})
+    rows = list(by_slug.values())
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
     urls = [f"{SITE_URL}/"]
     generated = 0
