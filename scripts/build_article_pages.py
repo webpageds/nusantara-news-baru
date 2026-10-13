@@ -72,10 +72,16 @@ def main() -> int:
         (folder / "index.html").write_text(make_page(template, article), encoding="utf-8")
         urls.append(f"{SITE_URL}/artikel/{article['slug']}/")
         generated += 1
-    stamp = dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-    url_xml = "\n".join(
-        f"  <url><loc>{html.escape(url)}</loc><lastmod>{stamp}</lastmod><changefreq>{'daily' if url == SITE_URL + '/' else 'weekly'}</changefreq><priority>{'1.0' if url == SITE_URL + '/' else '0.8'}</priority></url>"
-        for url in urls
+    today = dt.date.today().isoformat()
+    latest_date = max((str(a.get("date", "")) for a in rows if a.get("status") == "Published" and a.get("date")), default=today)
+    url_entries = [(f"{SITE_URL}/", latest_date)]
+    url_entries.extend(
+        (f"{SITE_URL}/artikel/{a['slug']}/", str(a.get("date") or latest_date))
+        for a in rows if a.get("status") == "Published" and a.get("slug")
+    )
+    url_xml = "\\n".join(
+        f"  <url><loc>{html.escape(url)}</loc><lastmod>{lastmod}</lastmod><changefreq>{'daily' if url == SITE_URL + '/' else 'weekly'}</changefreq><priority>{'1.0' if url == SITE_URL + '/' else '0.8'}</priority></url>"
+        for url, lastmod in url_entries
     )
     SITEMAP_PATH.write_text('<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + url_xml + '\n</urlset>\n', encoding="utf-8")
     print(f"Generated {generated} pages; refreshed sitemap.xml.")
