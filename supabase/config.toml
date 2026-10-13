@@ -1,0 +1,2 @@
+[functions.article-share]
+verify_jwt = false
