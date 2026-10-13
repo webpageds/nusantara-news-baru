@@ -42,6 +42,10 @@ content:
               label: Teknologi
             - name: Olahraga
               label: Olahraga
+            - name: Pendidikan
+              label: Pendidikan
+            - name: Sosial
+              label: Sosial
             - name: Lifestyle
               label: Lifestyle
       - name: excerpt
