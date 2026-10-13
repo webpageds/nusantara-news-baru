@@ -49,6 +49,7 @@ def make_page(template: str, article: dict) -> str:
     template = re.sub(r'<meta property="og:description" content="[^"]*">', f'<meta property="og:description" content="{attr(description)}">', template, count=1)
     template = re.sub(r'<meta property="og:url" content="[^"]*">', f'<meta property="og:url" content="{attr(canonical)}">', template, count=1)
     template = re.sub(r'<meta property="og:image" content="[^"]*">', f'<meta property="og:image" content="{attr(image)}">', template, count=1)
+    template = re.sub(r'<meta property="og:image:alt" content="[^"]*">', f'<meta property="og:image:alt" content="{attr(title)}">', template, count=1)
     template = re.sub(r'<meta property="og:image:width" content="[^"]*">', '<meta property="og:image:width" content="1200">', template, count=1)
     template = re.sub(r'<meta property="og:image:height" content="[^"]*">', '<meta property="og:image:height" content="630">', template, count=1)
     template = re.sub(r'<meta name="twitter:title" content="[^"]*">', f'<meta name="twitter:title" content="{attr(title)}">', template, count=1)
