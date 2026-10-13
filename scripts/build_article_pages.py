@@ -13,7 +13,7 @@ from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 ROOT = Path(__file__).resolve().parents[1]
 NEWS_PATH = ROOT / "data" / "news.json"
 TEMPLATE_PATH = ROOT / "article.html"
-SITE_URL = os.environ.get("SITE_URL", "https://webpageds.github.io/nusantara-news-baru").rstrip("/")
+SITE_URL = os.environ.get("SITE_URL", "https://nusantaranewsidn.com").rstrip("/")
 SITEMAP_PATH = ROOT / "sitemap.xml"
 
 def attr(value: str) -> str:
