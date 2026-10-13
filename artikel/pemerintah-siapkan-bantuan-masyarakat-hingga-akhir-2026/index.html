@@ -33,6 +33,7 @@
 <div class="article-ad-slot" aria-label="Ruang iklan"><div><small>RUANG IKLAN</small><span>Slot iklan artikel siap dihubungkan ke jaringan iklan atau mitra resmi.<br>Iklan akan tampil setelah kode penyedia ditambahkan.</span></div></div>
 <main class="wrap" id="pageMain"><div class="error"><h1>Memuat artikel…</h1><p>Mohon tunggu sebentar.</p></div></main>
 <script type="module" src="https://widgets.tradingview-widget.com/w/en/tv-ticker-tape.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="../../admin/config.js"></script>
 <footer><div class="wrap"><img class="footer-logo" src="../../assets/nusantaranews-logo.svg" alt="NusantaraNews"><p>NusantaraNews — Aktual, Berimbang, Mencerdaskan, Menginspirasi. Ringkasan berita mencantumkan tautan ke sumber laporan yang menjadi rujukan.</p><span>© <span id="year"></span> NusantaraNews.</span></div></footer>
 <script>
 (function(){
@@ -44,9 +45,9 @@ async function loadWeather(){const cfg=weatherCities[activeWeatherCity]||weather
 const cityPicker=document.getElementById("weatherCity");if(cityPicker)cityPicker.addEventListener("change",()=>{activeWeatherCity=cityPicker.value;tickClock();loadWeather();});loadWeather();
 document.getElementById("year").textContent=new Intl.DateTimeFormat("en",{year:"numeric",timeZone:"Asia/Jakarta"}).format(new Date());
 const params=new URLSearchParams(location.search),slug=params.get("slug")||(document.querySelector('meta[name="nn-article-slug"]')||{}).content||"";
-function articlePath(id){return new URL("artikel/"+encodeURIComponent(id)+"/","https://webpageds.github.io/nusantara-news-baru/").href;}
+function articlePath(id,item){return item&&item.sourceSystem==="supabase"?new URL("article.html?slug="+encodeURIComponent(id),new URL("./",location.href)).href:new URL("artikel/"+encodeURIComponent(id)+"/","https://webpageds.github.io/nusantara-news-baru/").href;}
 function safeLink(value){try{const u=new URL(value);return u.protocol==="https:"?u.href:""}catch(e){return ""}}
-function canonicalArticleUrl(a){return "https://webpageds.github.io/nusantara-news-baru/artikel/"+encodeURIComponent(a.slug)+"/";}
+function canonicalArticleUrl(a){return a.sourceSystem==="supabase"?new URL("article.html?slug="+encodeURIComponent(a.slug),new URL("./",location.href)).href:"https://webpageds.github.io/nusantara-news-baru/artikel/"+encodeURIComponent(a.slug)+"/";}
 function text(tag,className,value){const el=document.createElement(tag);if(className)el.className=className;el.textContent=value||"";return el}
 function renderArticle(a,all){
 const main=document.getElementById("pageMain");main.className="article-layout";main.innerHTML="";
@@ -72,7 +73,7 @@ main.appendChild(article);
 const aside=document.createElement("aside");aside.className="side-panel";aside.appendChild(text("h2","","Baca Juga"));
 const related=all.filter(item=>item.slug!==a.slug&&(item.category===a.category||!aside.querySelector(".related"))).slice(0,6);
 if(!related.length)aside.appendChild(text("p","related-placeholder","Belum ada artikel terkait."));
-related.forEach(item=>{const box=text("div","related","");box.appendChild(text("small","",item.category));const link=document.createElement("a");link.href=articlePath(item.slug||"");link.textContent=item.title;box.appendChild(link);aside.appendChild(box);});
+related.forEach(item=>{const box=text("div","related","");box.appendChild(text("small","",item.category));const link=document.createElement("a");link.href=articlePath(item.slug||"",item);link.textContent=item.title;box.appendChild(link);aside.appendChild(box);});
 aside.appendChild(text("p","related-placeholder","Telusuri tautan sumber pada setiap artikel untuk membaca laporan lengkap dan pembaruannya."));
 main.appendChild(aside);
 document.title=a.title+" | NusantaraNews";
@@ -84,7 +85,7 @@ const ld={ "@context":"https://schema.org","@type":"NewsArticle","headline":a.ti
 const script=document.createElement("script");script.type="application/ld+json";script.textContent=JSON.stringify(ld);document.head.appendChild(script);
 }
 function formatDate(a){if(!a.date)return "";const d=new Date(a.date+"T12:00:00");if(Number.isNaN(d.getTime()))return a.date;return new Intl.DateTimeFormat("id-ID",{day:"numeric",month:"long",year:"numeric"}).format(d)+(a.time?" • "+a.time:"");}
-fetch(new URL("../../data/news.json",location.href),{cache:"no-store"}).then(r=>{if(!r.ok)throw new Error("Gagal memuat berita");return r.json();}).then(rows=>{const published=rows.filter(a=>a.status==="Published");const article=published.find(a=>a.slug===slug);if(!article){document.getElementById("pageMain").innerHTML='<div class="error"><h1>Artikel tidak ditemukan</h1><p>Berita mungkin sudah dihapus atau belum diterbitkan.</p><a class="back-bottom" href="../../"><span class="arrow-left-icon" aria-hidden="true"></span>KEMBALI KE BERANDA</a></div>';return;}renderArticle(article,published);}).catch(()=>{document.getElementById("pageMain").innerHTML='<div class="error"><h1>Berita belum dapat dimuat</h1><p>Periksa koneksi internet atau coba lagi beberapa saat.</p><a class="back-bottom" href="../../"><span class="arrow-left-icon" aria-hidden="true"></span>KEMBALI KE BERANDA</a></div>';});
+const dataPath=location.pathname.includes("/artikel/")?"../../data/news.json":"./data/news.json";fetch(new URL(dataPath,location.href),{cache:"no-store"}).then(r=>{if(!r.ok)throw new Error("Gagal memuat berita");return r.json();}).then(async rows=>{let published=rows.filter(a=>a.status==="Published");let article=published.find(a=>a.slug===slug);const cfg=window.NN_SUPABASE_CONFIG||{};if(!article&&slug&&window.supabase&&cfg.url&&cfg.anonKey&&!String(cfg.url).includes("YOUR-PROJECT")&&!String(cfg.anonKey).includes("YOUR-ANON")){try{const db=window.supabase.createClient(cfg.url,cfg.anonKey);const result=await db.from("articles").select("*").eq("slug",slug).eq("status","published").maybeSingle();if(result.data){const a=result.data;article={slug:a.slug,title:a.title,category:a.category,excerpt:a.excerpt,body:a.body,author:a.author_name,date:(a.published_at||a.created_at||"").slice(0,10),time:"",image:a.image_url||"",caption:a.image_caption||"",sourceName:a.source_name||"",sourceUrl:a.source_url||"",status:"Published",sourceSystem:"supabase"};published=published.concat(article);}}catch(e){console.warn("Artikel Supabase belum dapat dimuat.",e);}}if(!article){document.getElementById("pageMain").innerHTML='<div class="error"><h1>Artikel tidak ditemukan</h1><p>Berita mungkin sudah dihapus atau belum diterbitkan.</p><a class="back-bottom" href="../../"><span class="arrow-left-icon" aria-hidden="true"></span>KEMBALI KE BERANDA</a></div>';return;}renderArticle(article,published);}).catch(()=>{document.getElementById("pageMain").innerHTML='<div class="error"><h1>Berita belum dapat dimuat</h1><p>Periksa koneksi internet atau coba lagi beberapa saat.</p><a class="back-bottom" href="../../"><span class="arrow-left-icon" aria-hidden="true"></span>KEMBALI KE BERANDA</a></div>';});
 })();
 </script>
 </body></html>
