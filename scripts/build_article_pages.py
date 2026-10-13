@@ -98,7 +98,7 @@ def make_page(template: str, article: dict) -> str:
     description = article.get("excerpt") or title
     image = share_image(article.get("image", ""))
     canonical = f"{SITE_URL}/artikel/{slug}/"
-    slug_meta = f'<meta name="nn-article-slug" content="{attr(slug)}">\n<meta name="nn-site-root" content="{SITE_URL}/">\n<link rel="canonical" href="{attr(canonical)}">\n<meta property="og:image:alt" content="{attr(title)}">'
+    slug_meta = f'<meta name="nn-article-slug" content="{attr(slug)}">\n<meta name="nn-site-root" content="{SITE_URL}/">\n<link rel="canonical" href="{attr(canonical)}">'
     # Generated article pages are nested two directories below the site root.
     template = template.replace('<script src="./admin/config.js"></script>', '<script src="../../admin/config.js"></script>')
     if '<meta name="nn-article-slug"' not in template:
