@@ -5,8 +5,12 @@ on:
     - cron: "19 */3 * * *"
   workflow_dispatch:
   push:
+    branches:
+      - main
     paths:
       - "article.html"
+      - "index.html"
+      - "data/news.json"
       - "scripts/update_news.py"
       - "scripts/build_article_pages.py"
 
