@@ -22,7 +22,10 @@ Dashboard: https://webpageds.github.io/nusantara-news-baru/admin/
 8. Buka URL dashboard, login dengan akun undangan, lalu coba simpan draft dan unggah foto.
 
 ## Penting tentang publikasi website
-Tahap ini menyimpan draft dan berita berstatus terbit di Supabase. Website publik saat ini masih dibangun dari `data/news.json` dan halaman artikel statis. Jadi, tombol terbitkan menyimpan status terbit di database, tetapi **belum otomatis menambahkan berita baru ke homepage publik atau menghasilkan metadata Open Graph unik untuk WhatsApp**. Integrasi sinkronisasi publikasi (homepage + halaman artikel crawlable + OG image/title) perlu disambungkan setelah Project URL/key Supabase tersedia. Jangan menganggap berita sudah tayang ke publik hanya karena status database berubah menjadi Terbit.
+
+Homepage dan halaman artikel memiliki jalur integrasi opsional ke Supabase. Setelah URL/key di \`admin/config.js\` diisi dan schema/RLS berhasil dipasang, berita berstatus \`published\` dari Supabase akan ikut tampil di homepage dan dapat dibuka melalui halaman artikel dinamis. Berita lama dari \`data/news.json\` tetap menjadi fallback, sehingga situs tidak kehilangan konten saat Supabase belum dikonfigurasi.
+
+**Batasan preview WhatsApp:** kartu pratinjau di dashboard dan teks WhatsApp sudah tersedia, tetapi crawler WhatsApp biasanya tidak menjalankan JavaScript. Karena itu artikel baru dari Supabase belum dijamin mendapat judul/foto unik pada kartu tautan WhatsApp. Untuk metadata sosial unik yang konsisten, tahap berikutnya perlu membangkitkan halaman HTML statis untuk artikel baru atau menambahkan layanan server-side yang mengembalikan Open Graph sesuai slug.
 
 ## Keamanan
 - Jangan simpan password atau service-role key di file apa pun.
