@@ -42,7 +42,7 @@ as $$
   select role from public.profiles where id = auth.uid()
 $$;
 revoke all on function public.current_newsroom_role() from public;
-grant execute on function public.current_newsroom_role() to authenticated;
+grant execute on function public.current_newsroom_role() to anon, authenticated;
 
 drop policy if exists "Profiles read by newsroom" on public.profiles;
 create policy "Profiles read by newsroom" on public.profiles
@@ -68,7 +68,7 @@ with check (created_by = auth.uid() and (status = 'draft' or public.current_news
 drop policy if exists "Editors update own drafts and admin updates all" on public.articles;
 create policy "Editors update own drafts and admin updates all" on public.articles
 for update to authenticated
-using (created_by = auth.uid() or public.current_newsroom_role() = 'admin')
+using ((created_by = auth.uid() and status = 'draft') or public.current_newsroom_role() = 'admin')
 with check (
   (created_by = auth.uid() and status = 'draft')
   or public.current_newsroom_role() = 'admin'
