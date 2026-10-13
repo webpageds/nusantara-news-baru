@@ -20,7 +20,8 @@ def attr(value: str) -> str:
     return html.escape(str(value or ""), quote=True)
 
 def share_image(url: str) -> str:
-    if not url.startswith("https://"):
+    """Return a valid image URL for social previews, preserving uploaded/source photos."""
+    if not url or not url.startswith("https://"):
         return SITE_URL + "/assets/nusantaranews-share.svg"
     try:
         parts = urlsplit(url)
