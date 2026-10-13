@@ -12,6 +12,10 @@ content:
     view:
       primary: title
     fields:
+      - name: slug
+        label: Slug URL (huruf kecil, gunakan tanda hubung)
+        type: string
+        required: true
       - name: title
         label: Judul berita
         type: string
@@ -28,16 +32,16 @@ content:
               label: Nasional
             - name: Daerah
               label: Daerah
-            - name: Politik
-              label: Politik
             - name: Ekonomi
               label: Ekonomi
+            - name: Internasional
+              label: Internasional
+            - name: Politik
+              label: Politik
             - name: Teknologi
               label: Teknologi
             - name: Olahraga
               label: Olahraga
-            - name: Lifestyle
-              label: Lifestyle
       - name: excerpt
         label: Ringkasan
         type: text
@@ -52,14 +56,26 @@ content:
         label: Tanggal publikasi
         type: date
         required: true
+      - name: time
+        label: Waktu publikasi
+        type: string
       - name: image
         label: URL gambar
         type: string
-        description: Tempel URL gambar yang boleh digunakan untuk publikasi.
+        description: Gunakan URL gambar yang diizinkan untuk publikasi; sebutkan jika ilustrasi.
+      - name: caption
+        label: Keterangan foto
+        type: string
       - name: body
         label: Isi berita
         type: text
         required: true
+      - name: sourceName
+        label: Nama sumber laporan
+        type: string
+      - name: sourceUrl
+        label: URL sumber laporan
+        type: string
       - name: status
         label: Status publikasi
         type: select
