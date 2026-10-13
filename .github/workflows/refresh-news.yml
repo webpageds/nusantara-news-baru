@@ -10,6 +10,8 @@ on:
     paths:
       - "article.html"
       - "index.html"
+      - "admin/index.html"
+      - "admin/config.js"
       - "data/news.json"
       - "scripts/update_news.py"
       - "scripts/build_article_pages.py"
