@@ -5,17 +5,17 @@
 <meta name="nn-article-slug" content="dies-natalis-himaksi-2026-merayakan-perjalanan-menguatkan-kebersamaan">
 <meta name="nn-site-root" content="https://nusantaranewsidn.com/">
 <link rel="canonical" href="https://nusantaranewsidn.com/artikel/dies-natalis-himaksi-2026-merayakan-perjalanan-menguatkan-kebersamaan/"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#102b46">
-<meta name="description" content="SERANG, BANTEN – Himpunan Mahasiswa Akuntansi (HIMAKSI) Universitas Pamulang Kampus Kota Serang menyelenggarakan kegiatan Dies Natalis ke-5 pada Kamis, 24 September 2026, secara luring (offline). Kegiatan ini mengusung tema “Refleksi Lima Tahun HIMAKSI dalam Kebersamaan, Regenerasi, dan Keberlanjuta">
+<meta name="description" content="Himpunan Mahasiswa Akuntansi (HIMAKSI) Universitas Pamulang Kampus Kota Serang menyelenggarakan kegiatan Dies Natalis ke-5">
 <meta property="og:type" content="article"><meta property="og:site_name" content="NusantaraNews"><meta property="og:locale" content="id_ID">
 <meta property="og:title" content="Dies Natalis HIMAKSI 2026: Merayakan Perjalanan, Menguatkan Kebersamaan">
-<meta property="og:description" content="SERANG, BANTEN – Himpunan Mahasiswa Akuntansi (HIMAKSI) Universitas Pamulang Kampus Kota Serang menyelenggarakan kegiatan Dies Natalis ke-5 pada Kamis, 24 September 2026, secara luring (offline). Kegiatan ini mengusung tema “Refleksi Lima Tahun HIMAKSI dalam Kebersamaan, Regenerasi, dan Keberlanjuta">
+<meta property="og:description" content="Himpunan Mahasiswa Akuntansi (HIMAKSI) Universitas Pamulang Kampus Kota Serang menyelenggarakan kegiatan Dies Natalis ke-5">
 <meta property="og:url" content="https://nusantaranewsidn.com/artikel/dies-natalis-himaksi-2026-merayakan-perjalanan-menguatkan-kebersamaan/">
 <meta property="og:image" content="https://xlenjofqukddoqntioep.supabase.co/storage/v1/object/public/news-media/a9f2ac91-39fb-47fc-8bf0-b41571558888/1791964862248-screenshot-2026-10-14-150043.png">
 <meta property="og:image:alt" content="Dies Natalis HIMAKSI 2026: Merayakan Perjalanan, Menguatkan Kebersamaan">
 <meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Dies Natalis HIMAKSI 2026: Merayakan Perjalanan, Menguatkan Kebersamaan">
-<meta name="twitter:description" content="SERANG, BANTEN – Himpunan Mahasiswa Akuntansi (HIMAKSI) Universitas Pamulang Kampus Kota Serang menyelenggarakan kegiatan Dies Natalis ke-5 pada Kamis, 24 September 2026, secara luring (offline). Kegiatan ini mengusung tema “Refleksi Lima Tahun HIMAKSI dalam Kebersamaan, Regenerasi, dan Keberlanjuta">
+<meta name="twitter:description" content="Himpunan Mahasiswa Akuntansi (HIMAKSI) Universitas Pamulang Kampus Kota Serang menyelenggarakan kegiatan Dies Natalis ke-5">
 <meta name="twitter:image" content="https://xlenjofqukddoqntioep.supabase.co/storage/v1/object/public/news-media/a9f2ac91-39fb-47fc-8bf0-b41571558888/1791964862248-screenshot-2026-10-14-150043.png">
 <link rel="icon" type="image/svg+xml" href="../../assets/nusantaranews-logo.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -48,7 +48,7 @@ const params=new URLSearchParams(location.search),slug=params.get("slug")||(docu
 function articlePath(id,item){const rootMeta=document.querySelector('meta[name="nn-site-root"]');const root=rootMeta&&rootMeta.content?rootMeta.content:new URL("./",location.href).href;if(item&&item.sourceSystem==="supabase")return new URL("article.html?slug="+encodeURIComponent(id),root).href;return new URL("artikel/"+encodeURIComponent(id)+"/",root).href;}
 function safeLink(value){try{const u=new URL(value);return u.protocol==="https:"?u.href:""}catch(e){return ""}}
 function canonicalArticleUrl(a){const slug=encodeURIComponent(a.slug||"");return new URL("artikel/"+slug+"/","https://nusantaranewsidn.com/").href;}
-function articleShareUrl(a){const slug=encodeURIComponent(String(a&&a.slug||"").trim());if(a&&a.sourceSystem==="supabase")return new URL("article.html?slug="+slug,"https://nusantaranewsidn.com/").href;return new URL("artikel/"+slug+"/","https://nusantaranewsidn.com/").href;}
+function articleShareUrl(a){const slug=encodeURIComponent(String(a&&a.slug||"").trim());if(a&&a.sourceSystem==="supabase"){const cfg=window.NN_SUPABASE_CONFIG||{};if(cfg.shareFunctionEnabled&&cfg.url)return cfg.url.replace(/\/$/,"")+"/functions/v1/article-share?slug="+slug;return new URL("article.html?slug="+slug,"https://nusantaranewsidn.com/").href;}return new URL("artikel/"+slug+"/","https://nusantaranewsidn.com/").href;}
 function text(tag,className,value){const el=document.createElement(tag);if(className)el.className=className;el.textContent=value||"";return el}
 function renderArticle(a,all){
 const main=document.getElementById("pageMain");main.className="article-layout";main.innerHTML="";
