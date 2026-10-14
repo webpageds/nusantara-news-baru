@@ -21,7 +21,7 @@ def attr(value: str) -> str:
     return html.escape(str(value or ""), quote=True)
 
 def share_image(url: str) -> str:
-    """Return a valid image URL for social previews, preserving uploaded/source photos."""
+    """Return a public image URL suitable for Open Graph cards."""
     if not url or not url.startswith("https://"):
         return SITE_URL + "/assets/nusantaranews-share.svg"
     try:
@@ -30,9 +30,10 @@ def share_image(url: str) -> str:
             query = parse_qs(parts.query)
             query.update({"fit": ["crop"], "w": ["1200"], "h": ["630"], "q": ["85"]})
             return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query, doseq=True), ""))
+        # Prefer only public, direct HTTPS image URLs. Supabase Storage public URLs are valid.
+        return url if parts.path.lower().endswith((".jpg", ".jpeg", ".png", ".webp", ".avif")) or "/storage/v1/object/public/" in parts.path else url
     except Exception:
-        pass
-    return url
+        return SITE_URL + "/assets/nusantaranews-share.svg"
 
 def fetch_supabase_articles() -> list[dict]:
     """Fetch only rows allowed by Supabase public SELECT/RLS for published articles."""
