@@ -29,7 +29,7 @@ Deno.serve(async request => {
   const article = Array.isArray(rows) ? rows[0] : null;
   if (!article) return new Response("Article not found", { status: 404 });
   const title = String(article.title || "NusantaraNews"), description = String(article.excerpt || title), image = safeImage(article.image_url);
-  const articleUrl = SITE_URL + "/article.html?slug=" + encodeURIComponent(article.slug);
+  const articleUrl = SITE_URL + "/artikel/" + encodeURIComponent(article.slug) + "/";
   const html = `<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} | NusantaraNews</title><meta name="description" content="${esc(description)}"><link rel="canonical" href="${esc(articleUrl)}">
 <meta property="og:type" content="article"><meta property="og:site_name" content="NusantaraNews"><meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(description)}"><meta property="og:url" content="${esc(articleUrl)}"><meta property="og:image" content="${esc(image)}"><meta property="og:image:secure_url" content="${esc(image)}"><meta property="og:image:alt" content="${esc(title)}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
