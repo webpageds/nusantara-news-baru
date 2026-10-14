@@ -19,6 +19,8 @@ create table if not exists public.articles (
   body text not null default '',
   image_url text,
   image_caption text,
+  image_urls jsonb not null default '[]'::jsonb check (jsonb_typeof(image_urls) = 'array' and jsonb_array_length(image_urls) <= 2),
+  image_captions jsonb not null default '[]'::jsonb check (jsonb_typeof(image_captions) = 'array' and jsonb_array_length(image_captions) <= 2),
   author_name text not null default '',
   source_name text,
   source_url text,
