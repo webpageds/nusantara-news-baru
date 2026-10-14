@@ -45,7 +45,7 @@ const params=new URLSearchParams(location.search),slug=params.get("slug")||(docu
 function articlePath(id,item){const rootMeta=document.querySelector('meta[name="nn-site-root"]');const root=rootMeta&&rootMeta.content?rootMeta.content:new URL("./",location.href).href;if(item&&item.sourceSystem==="supabase")return new URL("article.html?slug="+encodeURIComponent(id),root).href;return new URL("artikel/"+encodeURIComponent(id)+"/",root).href;}
 function safeLink(value){try{const u=new URL(value);return u.protocol==="https:"?u.href:""}catch(e){return ""}}
 function canonicalArticleUrl(a){const slug=encodeURIComponent(a.slug||"");return new URL("artikel/"+slug+"/","https://nusantaranewsidn.com/").href;}
-function articleShareUrl(a){const slug=encodeURIComponent(String(a&&a.slug||"").trim());return new URL("artikel/"+slug+"/","https://nusantaranewsidn.com/").href;}
+function articleShareUrl(a){const slug=encodeURIComponent(String(a&&a.slug||"").trim());if(a&&a.sourceSystem==="supabase")return new URL("article.html?slug="+slug,"https://nusantaranewsidn.com/").href;return new URL("artikel/"+slug+"/","https://nusantaranewsidn.com/").href;}
 function text(tag,className,value){const el=document.createElement(tag);if(className)el.className=className;el.textContent=value||"";return el}
 function renderArticle(a,all){
 const main=document.getElementById("pageMain");main.className="article-layout";main.innerHTML="";
