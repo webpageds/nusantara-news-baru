@@ -26,6 +26,13 @@ def share_image(url: str) -> str:
         return SITE_URL + "/assets/nusantaranews-share.svg"
     try:
         parts = urlsplit(url)
+        # GitHub blob pages are HTML wrappers; social crawlers need the direct image bytes.
+        if parts.netloc.lower() == "github.com" and "/blob/" in parts.path:
+            segments = parts.path.strip("/").split("/")
+            if len(segments) >= 5 and segments[2] == "blob":
+                owner, repo, branch = segments[0], segments[1], segments[3]
+                file_path = "/".join(segments[4:])
+                return urlunsplit(("https", "raw.githubusercontent.com", f"/{owner}/{repo}/{branch}/{file_path}", "", ""))
         if "images.unsplash.com" in parts.netloc:
             query = parse_qs(parts.query)
             query.update({"fit": ["crop"], "w": ["1200"], "h": ["630"], "q": ["85"]})
