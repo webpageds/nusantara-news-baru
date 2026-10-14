@@ -116,7 +116,7 @@ def make_page(template: str, article: dict) -> str:
     if '<meta property="og:image:type"' in template:
         template = re.sub(r'<meta property="og:image:type" content="[^"]*">', f'<meta property="og:image:type" content="{mime}">', template, count=1)
     else:
-        template = template.replace(f'<meta property="og:image" content="{attr(image)}">', f'<meta property="og:image" content="{attr(image)}">\\n<meta property="og:image:type" content="{mime}">', 1)
+        template = template.replace('</head>', f'<meta property="og:image:type" content="{mime}">\\n</head>', 1)
     template = re.sub(r'<meta property="og:image:alt" content="[^"]*">', f'<meta property="og:image:alt" content="{attr(title)}">', template, count=1)
     template = re.sub(r'<meta property="og:image:width" content="[^"]*">', '<meta property="og:image:width" content="1200">', template, count=1)
     template = re.sub(r'<meta property="og:image:height" content="[^"]*">', '<meta property="og:image:height" content="630">', template, count=1)
