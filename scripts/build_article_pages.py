@@ -84,6 +84,8 @@ def fetch_supabase_articles() -> list[dict]:
             "time": "",
             "image": row.get("image_url") or row.get("image") or "",
             "caption": row.get("image_caption") or row.get("caption") or "",
+            "imageUrls": (row.get("image_urls") if isinstance(row.get("image_urls"), list) else [])[:2],
+            "imageCaptions": (row.get("image_captions") if isinstance(row.get("image_captions"), list) else [])[:2],
             "sourceName": row.get("source_name") or row.get("sourceName") or "",
             "sourceUrl": row.get("source_url") or row.get("sourceUrl") or "",
             "status": "Published",
