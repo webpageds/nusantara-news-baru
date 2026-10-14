@@ -86,7 +86,43 @@ const ld={ "@context":"https://schema.org","@type":"NewsArticle","headline":a.ti
 const script=document.createElement("script");script.type="application/ld+json";script.textContent=JSON.stringify(ld);document.head.appendChild(script);
 }
 function formatDate(a){if(!a.date)return "";const d=new Date(a.date+"T12:00:00");if(Number.isNaN(d.getTime()))return a.date;return new Intl.DateTimeFormat("id-ID",{day:"numeric",month:"long",year:"numeric"}).format(d)+(a.time?" • "+a.time:"");}
-const dataPath=location.pathname.includes("/artikel/")?"../../data/news.json":"./data/news.json";fetch(new URL(dataPath,location.href),{cache:"no-store"}).then(r=>{if(!r.ok)throw new Error("Gagal memuat berita");return r.json();}).then(async rows=>{let published=rows.filter(a=>a.status==="Published");let article=published.find(a=>a.slug===slug);const cfg=window.NN_SUPABASE_CONFIG||{};if(!article&&slug&&window.supabase&&cfg.url&&cfg.anonKey&&!String(cfg.url).includes("YOUR-PROJECT")&&!String(cfg.anonKey).includes("YOUR-ANON")){try{const db=window.supabase.createClient(cfg.url,cfg.anonKey);const result=await db.from("articles").select("*").eq("slug",slug).eq("status","published").maybeSingle();if(result.data){const a=result.data;article={slug:a.slug,title:a.title,category:a.category,excerpt:a.excerpt,body:a.body,author:a.author_name,date:(a.published_at||a.created_at||"").slice(0,10),time:"",image:a.image_url||"",caption:a.image_caption||"",sourceName:a.source_name||"",sourceUrl:a.source_url||"",status:"Published",sourceSystem:"supabase"};published=published.concat(article);}}catch(e){console.warn("Artikel Supabase belum dapat dimuat.",e);}}if(!article){document.getElementById("pageMain").innerHTML='<div class="error"><h1>Artikel tidak ditemukan</h1><p>Berita mungkin sudah dihapus atau belum diterbitkan.</p><a class="back-bottom" href="../../"><span class="arrow-left-icon" aria-hidden="true"></span>KEMBALI KE BERANDA</a></div>';return;}renderArticle(article,published);}).catch(()=>{document.getElementById("pageMain").innerHTML='<div class="error"><h1>Berita belum dapat dimuat</h1><p>Periksa koneksi internet atau coba lagi beberapa saat.</p><a class="back-bottom" href="../../"><span class="arrow-left-icon" aria-hidden="true"></span>KEMBALI KE BERANDA</a></div>';});
+async function loadArticlePage(){
+ const main=document.getElementById("pageMain");
+ const cfg=window.NN_SUPABASE_CONFIG||{};
+ let published=[], article=null;
+ try{
+  const dataPath=location.pathname.includes("/artikel/")?"../../data/news.json":"./data/news.json";
+  const response=await fetch(new URL(dataPath,location.href),{cache:"no-store"});
+  if(response.ok){
+   const rows=await response.json();
+   published=rows.filter(a=>a.status==="Published");
+   article=published.find(a=>a.slug===slug)||null;
+  }
+ }catch(e){console.warn("Feed statis belum tersedia; mencoba Supabase.",e);}
+ if(slug&&window.supabase&&cfg.url&&cfg.anonKey){
+  try{
+   const db=window.supabase.createClient(cfg.url,cfg.anonKey);
+   const result=await db.from("articles").select("*").eq("slug",slug).eq("status","published").maybeSingle();
+   if(result.error)console.warn("Pencarian artikel Supabase gagal:",result.error.message);
+   if(result.data){
+    const a=result.data;
+    article={slug:a.slug,title:a.title,category:a.category,excerpt:a.excerpt,body:a.body,author:a.author_name,date:(a.published_at||a.created_at||"").slice(0,10),time:"",image:a.image_url||"",caption:a.image_caption||"",sourceName:a.source_name||"",sourceUrl:a.source_url||"",status:"Published",sourceSystem:"supabase"};
+    published=published.filter(item=>item.slug!==a.slug);
+    published.unshift(article);
+   }
+  }catch(e){console.error("Artikel Supabase belum dapat dimuat.",e);}
+ }
+ if(!article){
+  const home=location.pathname.includes("/artikel/")?"../../":"./";
+  main.innerHTML='<div class="error"><h1>Artikel tidak ditemukan</h1><p>Berita tidak ditemukan atau belum diterbitkan. Coba muat ulang beberapa saat lagi.</p><a class="back-bottom" href="'+home+'"><span class="arrow-left-icon" aria-hidden="true"></span>KEMBALI KE BERANDA</a></div>';
+  return;
+ }
+ renderArticle(article,published);
+}
+loadArticlePage().catch(e=>{
+ console.error(e);
+ document.getElementById("pageMain").innerHTML='<div class="error"><h1>Berita belum dapat dimuat</h1><p>Periksa koneksi atau coba lagi beberapa saat.</p><a class="back-bottom" href="../../">KEMBALI KE BERANDA</a></div>';
+});
 })();
 </script>
 </body></html>
