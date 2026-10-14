@@ -2,7 +2,7 @@ name: Refresh NusantaraNews headlines
 
 on:
   schedule:
-    - cron: "19 */3 * * *"
+    - cron: "*/5 * * * *"
   workflow_dispatch:
   push:
     branches:
