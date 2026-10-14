@@ -45,9 +45,9 @@ async function loadWeather(){const cfg=weatherCities[activeWeatherCity]||weather
 const cityPicker=document.getElementById("weatherCity");if(cityPicker)cityPicker.addEventListener("change",()=>{activeWeatherCity=cityPicker.value;tickClock();loadWeather();});loadWeather();
 document.getElementById("year").textContent=new Intl.DateTimeFormat("en",{year:"numeric",timeZone:"Asia/Jakarta"}).format(new Date());
 const params=new URLSearchParams(location.search),slug=params.get("slug")||(document.querySelector('meta[name="nn-article-slug"]')||{}).content||"";
-function articlePath(id,item){const rootMeta=document.querySelector('meta[name="nn-site-root"]');const root=rootMeta&&rootMeta.content?rootMeta.content:new URL("./",location.href).href;return new URL("artikel/"+encodeURIComponent(id)+"/",root).href;}
+function articlePath(id,item){const rootMeta=document.querySelector('meta[name="nn-site-root"]');const root=rootMeta&&rootMeta.content?rootMeta.content:new URL("./",location.href).href;if(item&&item.sourceSystem==="supabase")return new URL("article.html?slug="+encodeURIComponent(id),root).href;return new URL("artikel/"+encodeURIComponent(id)+"/",root).href;}
 function safeLink(value){try{const u=new URL(value);return u.protocol==="https:"?u.href:""}catch(e){return ""}}
-function canonicalArticleUrl(a){const rootMeta=document.querySelector('meta[name="nn-site-root"]');const root=rootMeta&&rootMeta.content?rootMeta.content:new URL("./",location.href).href;return new URL("artikel/"+encodeURIComponent(a.slug)+"/",root).href;}
+function canonicalArticleUrl(a){const cfg=window.NN_SUPABASE_CONFIG||{};const slug=encodeURIComponent(a.slug||"");if(a.sourceSystem==="supabase"&&cfg.shareFunctionEnabled===true&&cfg.url)return cfg.url.replace(/\/$/,"")+"/functions/v1/article-share?slug="+slug;const rootMeta=document.querySelector('meta[name="nn-site-root"]');const root=rootMeta&&rootMeta.content?rootMeta.content:new URL("./",location.href).href;return new URL("artikel/"+slug+"/",root).href;}
 function text(tag,className,value){const el=document.createElement(tag);if(className)el.className=className;el.textContent=value||"";return el}
 function renderArticle(a,all){
 const main=document.getElementById("pageMain");main.className="article-layout";main.innerHTML="";
