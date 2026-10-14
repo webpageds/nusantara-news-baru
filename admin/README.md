@@ -20,13 +20,13 @@ Dashboard: https://webpageds.github.io/nusantara-news-baru/admin/
 6. Buka Project Settings → API (atau API Keys), salin Project URL dan anon/publishable key.
 7. Edit `admin/config.js` di repository: ganti `YOUR-PROJECT` dan `YOUR-ANON-OR-PUBLISHABLE-KEY`, lalu commit. Key anon/publishable boleh berada di frontend **hanya** karena RLS di database/storage membatasi operasi. Jangan pernah menaruh `service_role` key di website.
 8. Buka URL dashboard, login dengan akun undangan, lalu coba simpan draft dan unggah foto.
-9. Untuk preview WhatsApp unik pada berita dashboard, deploy `supabase/functions/article-share/` sebagai Edge Function `article-share` dengan verifikasi JWT nonaktif hanya untuk endpoint preview. Setelah URL fungsi diuji, ubah `shareFunctionEnabled` di `admin/config.js` menjadi `true`. Fungsi hanya mengembalikan berita berstatus `published`; jangan pernah menaruh service-role key di frontend.
+9. Untuk preview WhatsApp unik pada berita dashboard, deploy `supabase/functions/article-share/` sebagai Edge Function `article-share` dengan verifikasi JWT nonaktif hanya untuk endpoint preview. Fungsi harus mengambil berita berstatus `published` dan mengembalikan metadata Open Graph beserta foto yang dapat diakses publik. Tombol salin tautan tetap memberi URL canonical `https://nusantaranewsidn.com/artikel/SLUG/`; gunakan URL Edge Function hanya di belakang redirect/preview share flow, bukan sebagai tautan artikel yang dibagikan. Jangan pernah menaruh service-role key di frontend.
 
 ## Penting tentang publikasi website
 
 Homepage dan halaman artikel memiliki jalur integrasi opsional ke Supabase. Setelah URL/key di \`admin/config.js\` diisi dan schema/RLS berhasil dipasang, berita berstatus \`published\` dari Supabase akan ikut tampil di homepage dan dapat dibuka melalui halaman artikel dinamis. Berita lama dari \`data/news.json\` tetap menjadi fallback, sehingga situs tidak kehilangan konten saat Supabase belum dikonfigurasi.
 
-**Preview WhatsApp untuk berita dashboard:** crawler WhatsApp tidak menjalankan JavaScript. Edge Function `supabase/functions/article-share/` mengembalikan metadata Open Graph unik (judul, ringkasan, dan foto publik) untuk berita Supabase yang diterbitkan. Deploy fungsi, tes endpoint, lalu set `shareFunctionEnabled: true` di `admin/config.js`. Sampai fungsi siap, nilainya `false` dan tautan artikel lama tetap digunakan.
+**Preview WhatsApp untuk berita dashboard:** crawler WhatsApp tidak menjalankan JavaScript. Edge Function `supabase/functions/article-share/` mengembalikan metadata Open Graph unik (judul, ringkasan, dan foto publik) untuk berita Supabase yang diterbitkan. Deploy fungsi sebagai `article-share` dengan JWT verification nonaktif khusus untuk endpoint preview, lalu tes endpoint. Tombol salin tautan harus tetap menghasilkan URL canonical website `https://nusantaranewsidn.com/artikel/SLUG/`, tidak menyalin URL Supabase. Pastikan halaman `/artikel/SLUG/` dibangkitkan setelah penerbitan agar URL yang dibagikan tidak 404.
 
 ## Keamanan
 - Jangan simpan password atau service-role key di file apa pun.
