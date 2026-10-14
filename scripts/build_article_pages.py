@@ -111,6 +111,12 @@ def make_page(template: str, article: dict) -> str:
     template = re.sub(r'<meta property="og:description" content="[^"]*">', f'<meta property="og:description" content="{attr(description)}">', template, count=1)
     template = re.sub(r'<meta property="og:url" content="[^"]*">', f'<meta property="og:url" content="{attr(canonical)}">', template, count=1)
     template = re.sub(r'<meta property="og:image" content="[^"]*">', f'<meta property="og:image" content="{attr(image)}">', template, count=1)
+    template = re.sub(r'<meta property="og:image:secure_url" content="[^"]*">', f'<meta property="og:image:secure_url" content="{attr(image)}">', template, count=1)
+    mime = 'image/png' if image.lower().split('?', 1)[0].endswith('.png') else ('image/webp' if image.lower().split('?', 1)[0].endswith('.webp') else 'image/jpeg')
+    if '<meta property="og:image:type"' in template:
+        template = re.sub(r'<meta property="og:image:type" content="[^"]*">', f'<meta property="og:image:type" content="{mime}">', template, count=1)
+    else:
+        template = template.replace(f'<meta property="og:image" content="{attr(image)}">', f'<meta property="og:image" content="{attr(image)}">\\n<meta property="og:image:type" content="{mime}">', 1)
     template = re.sub(r'<meta property="og:image:alt" content="[^"]*">', f'<meta property="og:image:alt" content="{attr(title)}">', template, count=1)
     template = re.sub(r'<meta property="og:image:width" content="[^"]*">', '<meta property="og:image:width" content="1200">', template, count=1)
     template = re.sub(r'<meta property="og:image:height" content="[^"]*">', '<meta property="og:image:height" content="630">', template, count=1)
