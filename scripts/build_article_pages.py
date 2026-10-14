@@ -99,7 +99,7 @@ def make_page(template: str, article: dict) -> str:
     slug = article.get("slug", "")
     title = article.get("title", "NusantaraNews")
     description = article.get("excerpt") or title
-    image = share_image(article.get("image", ""))
+    image = share_image(article.get("image", "") or next((str(value) for value in (article.get("imageUrls") or []) if str(value).strip()), ""))
     canonical = f"{SITE_URL}/artikel/{slug}/"
     slug_meta = f'<meta name="nn-article-slug" content="{attr(slug)}">\n<meta name="nn-site-root" content="{SITE_URL}/">\n<link rel="canonical" href="{attr(canonical)}">'
     # Generated article pages are nested two directories below the site root.
