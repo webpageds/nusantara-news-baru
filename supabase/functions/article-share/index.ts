@@ -21,7 +21,7 @@ Deno.serve(async request => {
   const publicKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY");
   if (!projectUrl || !publicKey) return new Response("Preview service not configured", { status: 503 });
   const endpoint = new URL("/rest/v1/articles", projectUrl);
-  endpoint.searchParams.set("select", "slug,title,excerpt,image_url");
+  endpoint.searchParams.set("select", "slug,title,excerpt,image_url,image_urls");
   endpoint.searchParams.set("slug", "eq." + slug);
   endpoint.searchParams.set("status", "eq.published");
   endpoint.searchParams.set("limit", "1");
@@ -30,12 +30,13 @@ Deno.serve(async request => {
   const rows = await response.json();
   const article = Array.isArray(rows) ? rows[0] : null;
   if (!article) return new Response("Article not found", { status: 404 });
-  const title = String(article.title || "NusantaraNews"), description = String(article.excerpt || title), image = safeImage(article.image_url);
+  const title = String(article.title || "NusantaraNews"), description = String(article.excerpt || title), galleryImage = Array.isArray(article.image_urls) ? article.image_urls.find((value: unknown) => typeof value === "string" && value.startsWith("https://")) : "";
+  const image = safeImage(article.image_url || galleryImage);
   const articleUrl = SITE_URL + "/artikel/" + encodeURIComponent(article.slug) + "/";
   // GitHub Pages is static: a newly published Supabase article may not have its\n  // /artikel/{slug}/ file until the scheduled page builder runs. Send readers\n  // to the live Supabase-backed article page immediately; keep the canonical\n  // URL in Open Graph metadata for the generated static page.\n  const landingUrl = SITE_URL + "/article.html?slug=" + encodeURIComponent(article.slug);
   const html = `<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} | NusantaraNews</title><meta name="description" content="${esc(description)}"><link rel="canonical" href="${esc(articleUrl)}">
 <meta property="og:type" content="article"><meta property="og:site_name" content="NusantaraNews"><meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(description)}"><meta property="og:url" content="${esc(articleUrl)}"><meta property="og:image" content="${esc(image)}"><meta property="og:image:secure_url" content="${esc(image)}"><meta property="og:image:alt" content="${esc(title)}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${esc(title)}"><meta name="twitter:description" content="${esc(description)}"><meta name="twitter:image" content="${esc(image)}"><meta http-equiv="refresh" content="0;url=${esc(landingUrl)}"></head><body><p><a href="${esc(articleUrl)}">Buka berita di NusantaraNews</a></p><script>location.replace(${JSON.stringify(landingUrl)});</script></body></html>`;
-  return new Response(request.method === "HEAD" ? null : html, { status: 200, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=60, s-maxage=300", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin" } });
+  return new Response(request.method === "HEAD" ? null : html, { status: 200, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=0, s-maxage=60", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin" } });
 });
