@@ -13,7 +13,9 @@ function safeImage(value: unknown): string {
 }
 Deno.serve(async request => {
   if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method not allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
-  const slug = (new URL(request.url).searchParams.get("slug") || "").trim();
+  const requestUrl = new URL(request.url);
+  const pathSlug = requestUrl.pathname.split("/").filter(Boolean).slice(-1)[0] || "";
+  const slug = (requestUrl.searchParams.get("slug") || (pathSlug !== "article-share" ? pathSlug : "")).trim();
   if (!slug || slug.length > 180) return new Response("Invalid slug", { status: 400 });
   const projectUrl = Deno.env.get("SUPABASE_URL");
   const publicKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY");
