@@ -128,7 +128,7 @@ def make_page(template: str, article: dict) -> str:
     if '<meta property="og:image:secure_url"' in template:
         template = re.sub(r'<meta property="og:image:secure_url" content="[^"]*">', secure_image_tag, template, count=1)
     else:
-        template = template.replace('</head>', secure_image_tag + '\\n</head>', 1)
+        template = template.replace('</head>', secure_image_tag + '\n</head>', 1)
     mime = 'image/png' if image.lower().split('?', 1)[0].endswith('.png') else ('image/webp' if image.lower().split('?', 1)[0].endswith('.webp') else 'image/jpeg')
     if '<meta property="og:image:type"' in template:
         template = re.sub(r'<meta property="og:image:type" content="[^"]*">', f'<meta property="og:image:type" content="{mime}">', template, count=1)
