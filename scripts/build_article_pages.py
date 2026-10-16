@@ -26,6 +26,7 @@ def share_image(url: str) -> str:
         return SITE_URL + "/assets/nusantaranews-share.svg"
     try:
         parts = urlsplit(url)
+        # Blogger URLs are normally direct images; preserve the full URL so size/format query parameters remain intact.
         # GitHub blob pages are HTML wrappers; social crawlers need the direct image bytes.
         if parts.netloc.lower() == "github.com" and "/blob/" in parts.path:
             segments = parts.path.strip("/").split("/")
@@ -37,8 +38,13 @@ def share_image(url: str) -> str:
             query = parse_qs(parts.query)
             query.update({"fit": ["crop"], "w": ["1200"], "h": ["630"], "q": ["85"]})
             return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query, doseq=True), ""))
-        # Prefer only public, direct HTTPS image URLs. Supabase Storage public URLs are valid.
-        return url if parts.path.lower().endswith((".jpg", ".jpeg", ".png", ".webp", ".avif")) or "/storage/v1/object/public/" in parts.path else url
+        # Some hosts use extensionless direct-image URLs (notably Blogger CDN); keep recognized public image CDNs.
+        if parts.netloc.lower().endswith(("blogger.googleusercontent.com", "bp.blogspot.com", "images.unsplash.com")):
+            return url
+        if parts.path.lower().endswith((".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif")) or "/storage/v1/object/public/" in parts.path:
+            return url
+        # GitHub file blobs were rewritten above; other non-image pages are unsuitable preview images.
+        return SITE_URL + "/assets/nusantaranews-share.svg"
     except Exception:
         return SITE_URL + "/assets/nusantaranews-share.svg"
 
