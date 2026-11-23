@@ -114,7 +114,14 @@ def request_feed(query: str) -> list[ET.Element]:
     return list(channel.findall("item")) if channel is not None else []
 
 def main() -> int:
-    rows = json.loads(NEWS_PATH.read_text(encoding="utf-8"))
+    try:
+        raw = NEWS_PATH.read_text(encoding="utf-8").strip()
+        rows = json.loads(raw) if raw else []
+        if not isinstance(rows, list):
+            raise ValueError("news.json must contain a JSON array")
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        print(f"[error] Cannot safely read existing news.json: {exc}")
+        return 1
     known_titles = {re.sub(r"\W+", " ", str(a.get("title", "")).lower()).strip() for a in rows}
     known_slugs = {a.get("slug") for a in rows}
     candidates: list[dict] = []
