@@ -149,7 +149,14 @@ def make_page(template: str, article: dict) -> str:
     return template
 
 def main() -> int:
-    feed_rows = json.loads(NEWS_PATH.read_text(encoding="utf-8"))
+    try:
+        raw = NEWS_PATH.read_text(encoding="utf-8").strip()
+        feed_rows = json.loads(raw) if raw else []
+        if not isinstance(feed_rows, list):
+            raise ValueError("news.json must contain a JSON array")
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        print(f"[error] Cannot safely read existing news.json: {exc}")
+        return 1
     supabase_rows = fetch_supabase_articles()
     # Prefer the live Supabase row when a slug appears in both sources.
     by_slug = {
