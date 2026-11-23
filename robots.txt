@@ -1,3 +1,4 @@
 User-agent: *
 Allow: /
-Sitemap: https://webpageds.github.io/nusantara-news-baru/sitemap.xml
+
+Sitemap: https://nusantaranewsidn.com/sitemap.xml
