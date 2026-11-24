@@ -153,14 +153,6 @@ def publisher_page_image(url: str) -> str | None:
             candidate = urllib.parse.urljoin(final_url, parser.image)
             if valid_article_image(candidate):
                 return candidate
-        # Parse article-specific image candidates, but reject publisher logos,
-        # category icons and tiny UI thumbnails.
-        markup = html_bytes.decode("utf-8", errors="replace")
-        candidates = re.findall(r'<img[^>]+(?:data-src|data-original|src)=["\\x27]([^"\\x27]+)["\\x27]', markup, re.I)
-        for candidate in candidates:
-            candidate = urllib.parse.urljoin(final_url, html.unescape(candidate))
-            if valid_article_image(candidate):
-                return candidate
     except Exception as exc:
         print(f"[warn] cannot read publisher image from {publisher_url}: {exc}")
     return None
