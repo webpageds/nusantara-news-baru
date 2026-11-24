@@ -42,7 +42,7 @@ Deno.serve(async request => {
   const publicKey = Deno.env.get("SUPABASE_ANON_KEY") || Deno.env.get("SUPABASE_PUBLISHABLE_KEY");
   if (!projectUrl || !publicKey) return new Response("Preview service not configured", { status: 503 });
   const endpoint = new URL("/rest/v1/articles", projectUrl);
-  endpoint.searchParams.set("select", "slug,title,excerpt,image_url,image_urls");
+  endpoint.searchParams.set("select", "slug,title,excerpt,image_url,image_urls,source_url,source_name");
   endpoint.searchParams.set("slug", "eq." + slug);
   endpoint.searchParams.set("status", "eq.published");
   endpoint.searchParams.set("limit", "1");
