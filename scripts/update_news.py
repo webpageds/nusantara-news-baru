@@ -253,6 +253,9 @@ def main() -> int:
             link = (item.findtext("link") or "").strip()
             if not raw_title or not link.startswith("https://"):
                 continue
+            publisher_link = resolve_publisher_url(link)
+            if publisher_link:
+                link = publisher_link
             normalized = re.sub(r"\W+", " ", raw_title.lower()).strip()
             if normalized in known_titles:
                 continue
