@@ -159,21 +159,27 @@ def main() -> int:
     except (OSError, json.JSONDecodeError, ValueError) as exc:
         print(f"[error] Cannot safely read existing news.json: {exc}")
         return 1
+    # Merge separate opinion content without mixing it into the auto-import feed.
+    opinion_rows = []
     if OPINION_PATH.exists():
         try:
             opinion_rows = json.loads(OPINION_PATH.read_text(encoding="utf-8"))
-            if isinstance(opinion_rows, list):
-                feed_rows.extend(opinion_rows)
-                print(f"Loaded {len(opinion_rows)} editorial opinion(s).")
+            if not isinstance(opinion_rows, list):
+                opinion_rows = []
         except (OSError, json.JSONDecodeError) as exc:
             print(f"[warn] Could not read opinions.json: {exc}")
+            opinion_rows = []
     supabase_rows = fetch_supabase_articles()
-    # Prefer the live Supabase row when a slug appears in both sources.
     by_slug = {
         str(article.get("slug")): article
         for article in feed_rows
         if article.get("status") == "Published" and article.get("slug")
     }
+    by_slug.update({
+        str(article.get("slug")): article
+        for article in opinion_rows
+        if article.get("status") == "Published" and article.get("slug")
+    })
     by_slug.update({str(article["slug"]): article for article in supabase_rows})
     rows = list(by_slug.values())
     template = TEMPLATE_PATH.read_text(encoding="utf-8")
