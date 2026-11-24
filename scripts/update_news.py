@@ -153,16 +153,14 @@ def publisher_page_image(url: str) -> str | None:
             candidate = urllib.parse.urljoin(final_url, parser.image)
             if valid_article_image(candidate):
                 return candidate
-        # Prefer large content images in article markup if OG metadata is absent.
+        # Parse article-specific image candidates, but reject publisher logos,
+        # category icons and tiny UI thumbnails.
         markup = html_bytes.decode("utf-8", errors="replace")
-        for pattern in (
-            r'<meta[^>]+(?:property|name)=["\\'](?:og:image|twitter:image)["\\'][^>]+content=["\\']([^"\\']+)',
-            r'<img[^>]+(?:data-src|data-original|src)=["\\']([^"\\']+)',
-        ):
-            for candidate in re.findall(pattern, markup, re.I):
-                candidate = urllib.parse.urljoin(final_url, html.unescape(candidate))
-                if valid_article_image(candidate):
-                    return candidate
+        candidates = re.findall(r'<img[^>]+(?:data-src|data-original|src)=["\\x27]([^"\\x27]+)["\\x27]', markup, re.I)
+        for candidate in candidates:
+            candidate = urllib.parse.urljoin(final_url, html.unescape(candidate))
+            if valid_article_image(candidate):
+                return candidate
     except Exception as exc:
         print(f"[warn] cannot read publisher image from {publisher_url}: {exc}")
     return None
@@ -208,30 +206,35 @@ def main() -> int:
     candidates: list[dict] = []
     now = dt.datetime.now(TZ)
 
-    # Repair old automatically imported cards that still use generic stock photos.
+    # Repair imported cards in batches; re-check every feed photo because some
+    # old entries point to Google News proxy thumbnails shared across stories.
     repaired = 0
-    for article in rows:
-        if repaired >= MAX_REPAIR_PER_RUN:
-            break
-        if not article.get("autoImported"):
-            continue
-        current_image = str(article.get("image") or "")
-        if current_image and valid_article_image(current_image) and "images.unsplash.com" not in current_image:
-            # Revalidate all previously imported images using the publisher's current image.
-            pass
-        source_url = str(article.get("sourceUrl") or "")
-        if not source_url:
-            continue
-        actual_image = publisher_page_image(source_url)
-        if actual_image:
-            if article.get("image") != actual_image:
+    repair_cursor = int(rows[0].get("_imageRepairCursor", 0)) if rows and rows[0].get("_imageRepairCursor") else 0
+    imported_indexes = [i for i, article in enumerate(rows) if article.get("autoImported")]
+    if imported_indexes:
+        batch = imported_indexes[repair_cursor:repair_cursor + MAX_REPAIR_PER_RUN]
+        if not batch:
+            batch = imported_indexes[:MAX_REPAIR_PER_RUN]
+            repair_cursor = 0
+        for index in batch:
+            article = rows[index]
+            source_url = str(article.get("sourceUrl") or "")
+            if not source_url:
+                continue
+            actual_image = publisher_page_image(source_url)
+            if actual_image and article.get("image") != actual_image:
                 article["image"] = actual_image
                 article["caption"] = f"Foto artikel dari penerbit {article.get('sourceName', 'sumber berita')}; kredit mengikuti sumber asli."
                 repaired += 1
-        elif article.get("image"):
-            article["image"] = ""
-            article["caption"] = "Foto artikel belum dapat diverifikasi dari penerbit; gunakan tautan sumber."
-            repaired += 1
+            elif not actual_image and article.get("image"):
+                article["image"] = ""
+                article["caption"] = "Foto artikel belum dapat diverifikasi dari penerbit; gambar tidak ditampilkan."
+                repaired += 1
+        next_cursor = repair_cursor + len(batch)
+        if next_cursor >= len(imported_indexes):
+            next_cursor = 0
+        if rows:
+            rows[0]["_imageRepairCursor"] = next_cursor
     if repaired:
         print(f"Repaired {repaired} existing article image(s).")
 
@@ -294,7 +297,7 @@ def main() -> int:
 
     candidates.sort(key=lambda a: (a["date"], a["time"]), reverse=True)
     additions = candidates[:MAX_NEW_PER_RUN]
-    if not additions and not repaired:
+    if not additions and not repaired and not imported_indexes:
         print("No new headlines or image repairs found; leaving news.json unchanged.")
         return 0
     existing = {a.get("slug") for a in rows}
