@@ -107,7 +107,6 @@ def main() -> int:
     known_titles = {re.sub(r"\W+", " ", str(a.get("title", "")).lower()).strip() for a in rows}
     known_slugs = {a.get("slug") for a in rows}
     candidates: list[dict] = []
-    used_fallback_images: set[str] = set()
     now = dt.datetime.now(TZ)
 
     for category, query in FEEDS.items():
@@ -148,7 +147,7 @@ def main() -> int:
             known_slugs.add(slug)
             image = item_image(item)
             caption = f"Gambar ilustrasi kategori {category}; bukan foto langsung peristiwa." if not image else "Gambar dari feed sumber; periksa keterangan sumber untuk konteks foto."
-            fallback_image = choose_fallback_image(slug, used_fallback_images) if image is None else None
+            fallback_image = choose_fallback_image(category) if image is None else None
             if fallback_image:
                 used_fallback_images.add(fallback_image)
             candidates.append({
