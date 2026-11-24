@@ -133,7 +133,7 @@ def item_image(item: ET.Element, article_url: str = "") -> str | None:
             if candidate.startswith("https://") and not host.endswith(("google.com", "googleusercontent.com", "gstatic.com")):
                 return candidate
     desc = html.unescape(item.findtext("description") or "")
-    match = re.search(r'<img\\b[^>]+(?:src|data-src)=["\\x27]([^"\\x27]+)["\\x27]', desc, re.I)
+    match = re.search(r'<img\b[^>]+(?:src|data-src)=["\x27]([^"\x27]+)["\x27]', desc, re.I)
     if match:
         candidate = html.unescape(match.group(1)).strip()
         host = urllib.parse.urlsplit(candidate).netloc.lower()
