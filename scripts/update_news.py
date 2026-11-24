@@ -77,74 +77,111 @@ class _MetaImageParser(HTMLParser):
 
 
 def resolve_publisher_url(url: str) -> str:
-    """Follow a Google News redirect to the publisher article."""
+    """Resolve Google News RSS links to the publisher article URL."""
     if not url.startswith(("https://", "http://")):
         return ""
     try:
+        parts = urllib.parse.urlsplit(url)
+        if parts.netloc.lower().endswith("news.google.com"):
+            # Google News article links sometimes encode the publisher URL in
+            # the RSS wrapper; otherwise, follow the redirect normally.
+            query = urllib.parse.parse_qs(parts.query)
+            for key in ("url", "u", "q"):
+                value = (query.get(key) or [""])[0]
+                if value.startswith(("https://", "http://")) and "google." not in urllib.parse.urlsplit(value).netloc.lower():
+                    return value
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; NusantaraNewsBot/1.0)"})
         with urllib.request.urlopen(req, timeout=15) as response:
             final_url = response.geturl()
+            html_bytes = response.read(500000)
         host = urllib.parse.urlsplit(final_url).netloc.lower()
-        return "" if host.endswith(("news.google.com", "google.com")) else final_url
+        if not host.endswith(("news.google.com", "google.com")):
+            return final_url
+        # Some Google News wrappers expose the original article link in HTML.
+        text = html_bytes.decode("utf-8", errors="replace")
+        patterns = [
+            r'https?://[^"\\\\ ]+',
+            r'url=([^&"\\\\ ]+)',
+        ]
+        for pattern in patterns:
+            for match in re.findall(pattern, text):
+                candidate = urllib.parse.unquote(html.unescape(match)).replace("\\\\u003d", "=")
+                if candidate.startswith(("https://", "http://")):
+                    c_host = urllib.parse.urlsplit(candidate).netloc.lower()
+                    if c_host and not c_host.endswith(("google.com", "googleusercontent.com", "gstatic.com")):
+                        return candidate
     except Exception as exc:
         print(f"[warn] cannot resolve publisher URL {url}: {exc}")
-        return ""
+    return ""
+
+
+def valid_article_image(url: str) -> bool:
+    """Reject generic logos, avatars, Google thumbnails and tiny preview images."""
+    try:
+        parts = urllib.parse.urlsplit(url)
+        host, path = parts.netloc.lower(), parts.path.lower()
+        if parts.scheme != "https" or not host:
+            return False
+        if host.endswith(("google.com", "googleusercontent.com", "gstatic.com")):
+            return False
+        if any(token in path for token in ("logo", "favicon", "icon", "avatar", "default", "placeholder")):
+            return False
+        if re.search(r"(?:w|width|sz)=\d{1,3}(?:&|$)", parts.query):
+            return False
+        return True
+    except Exception:
+        return False
 
 def publisher_page_image(url: str) -> str | None:
-    """Read the actual publisher page's lead image; reject Google branding."""
+    """Read the publisher article's image metadata, rejecting generic graphics."""
     publisher_url = resolve_publisher_url(url)
     if not publisher_url:
         return None
     try:
-        req = urllib.request.Request(publisher_url, headers={"User-Agent": "Mozilla/5.0 (compatible; NusantaraNewsBot/1.0)", "Accept": "text/html,application/xhtml+xml"})
+        req = urllib.request.Request(publisher_url, headers={
+            "User-Agent": "Mozilla/5.0 (compatible; NusantaraNewsBot/1.0)",
+            "Accept": "text/html,application/xhtml+xml",
+        })
         with urllib.request.urlopen(req, timeout=12) as response:
             final_url = response.geturl()
             if "html" not in response.headers.get("Content-Type", "").lower():
                 return None
-            html_bytes = response.read(1500000)
+            html_bytes = response.read(1800000)
         parser = _MetaImageParser()
         parser.feed(html_bytes.decode("utf-8", errors="replace"))
-        if not parser.image:
-            return None
-        image_url = urllib.parse.urljoin(final_url, parser.image)
-        parts = urllib.parse.urlsplit(image_url)
-        host, path = parts.netloc.lower(), parts.path.lower()
-        if not image_url.startswith("https://") or host.endswith(("google.com", "googleusercontent.com", "gstatic.com")):
-            return None
-        if any(x in path for x in ("logo", "favicon", "icon", "avatar", "default")):
-            return None
-        # Google News proxy thumbnails can be identical generic cards; require
-        # a larger publisher-origin image and reject its shared preview proxy.
-        if host.endswith("googleusercontent.com"):
-            return None
-        if re.search(r"(?:w=\d{1,3}|s0-w\d{1,3})(?:$|[&?])", image_url):
-            return None
-        return image_url
+        if parser.image:
+            candidate = urllib.parse.urljoin(final_url, parser.image)
+            if valid_article_image(candidate):
+                return candidate
+        # Prefer large content images in article markup if OG metadata is absent.
+        markup = html_bytes.decode("utf-8", errors="replace")
+        for pattern in (
+            r'<meta[^>]+(?:property|name)=["\\'](?:og:image|twitter:image)["\\'][^>]+content=["\\']([^"\\']+)',
+            r'<img[^>]+(?:data-src|data-original|src)=["\\']([^"\\']+)',
+        ):
+            for candidate in re.findall(pattern, markup, re.I):
+                candidate = urllib.parse.urljoin(final_url, html.unescape(candidate))
+                if valid_article_image(candidate):
+                    return candidate
     except Exception as exc:
         print(f"[warn] cannot read publisher image from {publisher_url}: {exc}")
-        return None
+    return None
 
 def item_image(item: ET.Element, article_url: str = "") -> str | None:
-    """Prefer actual publisher og:image and reject Google News preview graphics."""
+    """Use only a verified image from the original publisher article."""
     publisher_url = resolve_publisher_url(article_url) if article_url else ""
     if publisher_url:
         image = publisher_page_image(publisher_url)
         if image:
             return image
+    # RSS media metadata is accepted only when hosted by a publisher/CDN,
+    # never Google News, generic Google thumbnail services or stock providers.
     for elem in item.iter():
         tag = elem.tag.lower()
         if tag.endswith("}content") or tag.endswith("}thumbnail") or tag.endswith("enclosure"):
             candidate = (elem.attrib.get("url") or elem.attrib.get("href") or "").strip()
-            host = urllib.parse.urlsplit(candidate).netloc.lower()
-            if candidate.startswith("https://") and not host.endswith(("google.com", "googleusercontent.com", "gstatic.com")):
+            if valid_article_image(candidate):
                 return candidate
-    desc = html.unescape(item.findtext("description") or "")
-    match = re.search(r'<img\b[^>]+(?:src|data-src)=["\x27]([^"\x27]+)["\x27]', desc, re.I)
-    if match:
-        candidate = html.unescape(match.group(1)).strip()
-        host = urllib.parse.urlsplit(candidate).netloc.lower()
-        if candidate.startswith("https://") and not host.endswith(("google.com", "googleusercontent.com", "gstatic.com")):
-            return candidate
     return None
 
 def request_feed(query: str) -> list[ET.Element]:
@@ -179,19 +216,22 @@ def main() -> int:
         if not article.get("autoImported"):
             continue
         current_image = str(article.get("image") or "")
-        if current_image and "images.unsplash.com" not in current_image and "news.google.com" not in current_image:
-            continue
+        if current_image and valid_article_image(current_image) and "images.unsplash.com" not in current_image:
+            # Revalidate all previously imported images using the publisher's current image.
+            pass
         source_url = str(article.get("sourceUrl") or "")
         if not source_url:
             continue
         actual_image = publisher_page_image(source_url)
         if actual_image:
-            article["image"] = actual_image
-            article["caption"] = f"Foto utama dari penerbit {article.get('sourceName', 'sumber berita')}; periksa kredit pada artikel asli."
-        else:
+            if article.get("image") != actual_image:
+                article["image"] = actual_image
+                article["caption"] = f"Foto artikel dari penerbit {article.get('sourceName', 'sumber berita')}; kredit mengikuti sumber asli."
+                repaired += 1
+        elif article.get("image"):
             article["image"] = ""
-            article["caption"] = "Foto asli dari penerbit belum dapat diverifikasi; gambar tidak ditampilkan."
-        repaired += 1
+            article["caption"] = "Foto artikel belum dapat diverifikasi dari penerbit; gunakan tautan sumber."
+            repaired += 1
     if repaired:
         print(f"Repaired {repaired} existing article image(s).")
 
