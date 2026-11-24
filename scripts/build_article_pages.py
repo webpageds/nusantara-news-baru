@@ -101,6 +101,7 @@ def fetch_supabase_articles() -> list[dict]:
             "imageCaptions": (row.get("image_captions") if isinstance(row.get("image_captions"), list) else [])[:2],
             "sourceName": row.get("source_name") or row.get("sourceName") or "",
             "sourceUrl": row.get("source_url") or row.get("sourceUrl") or "",
+            "updated_at": row.get("updated_at") or row.get("published_at") or "",
             "status": "Published",
             "sourceSystem": "supabase",
         })
