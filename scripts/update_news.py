@@ -33,22 +33,11 @@ FEEDS = {
     "Sosial": "sosial masyarakat bantuan Indonesia when:1d",
     "Lifestyle": "gaya hidup budaya kesehatan Indonesia when:1d",
 }
-# Editorial fallback illustrations by category; never rotate unrelated images.
-FALLBACK_IMAGES = {
-    "Nasional": "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=1400&q=85",
-    "Daerah": "https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=1400&q=85",
-    "Ekonomi": "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1400&q=85",
-    "Internasional": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1400&q=85",
-    "Politik": "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=1400&q=85",
-    "Teknologi": "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1400&q=85",
-    "Olahraga": "https://images.unsplash.com/photo-1464359982907-8f8fb5a8a1e1?auto=format&fit=crop&w=1400&q=85",
-    "Pendidikan": "https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1400&q=85",
-    "Sosial": "https://images.unsplash.com/photo-1593113598332-cd288d649433?auto=format&fit=crop&w=1400&q=85",
-    "Lifestyle": "https://images.unsplash.com/photo-1499209974431-9dddcece7f88?auto=format&fit=crop&w=1400&q=85",
-}
+# Never use generic stock photos as if they documented an individual article.
+FALLBACK_IMAGES = {}
 
 def choose_fallback_image(category: str) -> str:
-    return FALLBACK_IMAGES.get(category, FALLBACK_IMAGES["Nasional"])
+    return ""
 
 def clean_text(value: str) -> str:
     value = re.sub(r"<(script|style)\b[^>]*>.*?</\1>", " ", value or "", flags=re.I | re.S)
@@ -87,50 +76,70 @@ class _MetaImageParser(HTMLParser):
                 self.image = candidate
 
 
-def publisher_page_image(url: str) -> str | None:
-    """Resolve a news link and read its publisher-provided Open Graph image."""
+def resolve_publisher_url(url: str) -> str:
+    """Follow a Google News redirect to the publisher article."""
     if not url.startswith(("https://", "http://")):
+        return ""
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; NusantaraNewsBot/1.0)"})
+        with urllib.request.urlopen(req, timeout=15) as response:
+            final_url = response.geturl()
+        host = urllib.parse.urlsplit(final_url).netloc.lower()
+        return "" if host.endswith(("news.google.com", "google.com")) else final_url
+    except Exception as exc:
+        print(f"[warn] cannot resolve publisher URL {url}: {exc}")
+        return ""
+
+def publisher_page_image(url: str) -> str | None:
+    """Read the actual publisher page's lead image; reject Google branding."""
+    publisher_url = resolve_publisher_url(url)
+    if not publisher_url:
         return None
     try:
-        req = urllib.request.Request(
-            url,
-            headers={
-                "User-Agent": "Mozilla/5.0 (compatible; NusantaraNewsBot/1.0)",
-                "Accept": "text/html,application/xhtml+xml",
-            },
-        )
+        req = urllib.request.Request(publisher_url, headers={"User-Agent": "Mozilla/5.0 (compatible; NusantaraNewsBot/1.0)", "Accept": "text/html,application/xhtml+xml"})
         with urllib.request.urlopen(req, timeout=12) as response:
             final_url = response.geturl()
-            content_type = response.headers.get("Content-Type", "")
-            if "html" not in content_type.lower():
+            if "html" not in response.headers.get("Content-Type", "").lower():
                 return None
-            html_bytes = response.read(1_500_000)
+            html_bytes = response.read(1500000)
         parser = _MetaImageParser()
         parser.feed(html_bytes.decode("utf-8", errors="replace"))
-        if parser.image:
-            image_url = urllib.parse.urljoin(final_url, parser.image)
-            if image_url.startswith(("https://", "http://")):
-                return image_url
+        if not parser.image:
+            return None
+        image_url = urllib.parse.urljoin(final_url, parser.image)
+        parts = urllib.parse.urlsplit(image_url)
+        host, path = parts.netloc.lower(), parts.path.lower()
+        if not image_url.startswith("https://") or host.endswith(("google.com", "googleusercontent.com", "gstatic.com")):
+            return None
+        if any(x in path for x in ("logo", "favicon", "icon", "avatar", "default")):
+            return None
+        return image_url
     except Exception as exc:
-        print(f"[warn] cannot read publisher image from {url}: {exc}")
-    return None
-
+        print(f"[warn] cannot read publisher image from {publisher_url}: {exc}")
+        return None
 
 def item_image(item: ET.Element, article_url: str = "") -> str | None:
-    """Prefer publisher RSS image metadata, then publisher page og:image."""
+    """Prefer actual publisher og:image and reject Google News preview graphics."""
+    publisher_url = resolve_publisher_url(article_url) if article_url else ""
+    if publisher_url:
+        image = publisher_page_image(publisher_url)
+        if image:
+            return image
     for elem in item.iter():
         tag = elem.tag.lower()
         if tag.endswith("}content") or tag.endswith("}thumbnail") or tag.endswith("enclosure"):
             candidate = (elem.attrib.get("url") or elem.attrib.get("href") or "").strip()
-            if candidate.startswith(("https://", "http://")):
+            host = urllib.parse.urlsplit(candidate).netloc.lower()
+            if candidate.startswith("https://") and not host.endswith(("google.com", "googleusercontent.com", "gstatic.com")):
                 return candidate
     desc = html.unescape(item.findtext("description") or "")
-    match = re.search(r"""<img\b[^>]+(?:src|data-src)=["']([^"']+)["']""", desc, re.I)
+    match = re.search(r'<img\\b[^>]+(?:src|data-src)=["\\x27]([^"\\x27]+)["\\x27]', desc, re.I)
     if match:
         candidate = html.unescape(match.group(1)).strip()
-        if candidate.startswith(("https://", "http://")):
+        host = urllib.parse.urlsplit(candidate).netloc.lower()
+        if candidate.startswith("https://") and not host.endswith(("google.com", "googleusercontent.com", "gstatic.com")):
             return candidate
-    return publisher_page_image(article_url) if article_url else None
+    return None
 
 def request_feed(query: str) -> list[ET.Element]:
     params = urllib.parse.urlencode({"q": query, "hl": "id", "gl": "ID", "ceid": "ID:id"})
@@ -164,7 +173,7 @@ def main() -> int:
         if not article.get("autoImported"):
             continue
         current_image = str(article.get("image") or "")
-        if "images.unsplash.com" not in current_image and current_image:
+        if current_image and "images.unsplash.com" not in current_image and "news.google.com" not in current_image:
             continue
         source_url = str(article.get("sourceUrl") or "")
         if not source_url:
@@ -173,7 +182,10 @@ def main() -> int:
         if actual_image:
             article["image"] = actual_image
             article["caption"] = f"Foto utama dari penerbit {article.get('sourceName', 'sumber berita')}; periksa kredit pada artikel asli."
-            repaired += 1
+        else:
+            article["image"] = ""
+            article["caption"] = "Foto asli dari penerbit belum dapat diverifikasi; gambar tidak ditampilkan."
+        repaired += 1
     if repaired:
         print(f"Repaired {repaired} existing article image(s).")
 
@@ -214,8 +226,8 @@ def main() -> int:
             known_titles.add(normalized)
             known_slugs.add(slug)
             image = item_image(item, link)
-            caption = f"Ilustrasi kategori {category}; foto utama dari penerbit tidak tersedia." if not image else f"Foto dari penerbit {source_name}; periksa kredit pada artikel asli."
-            fallback_image = choose_fallback_image(category) if image is None else None
+            caption = f"Foto dari penerbit {source_name}; periksa kredit pada artikel asli." if image else "Foto asli dari penerbit belum dapat diverifikasi; gambar tidak ditampilkan."
+            fallback_image = None
             candidates.append({
                 "slug": slug,
                 "title": raw_title[:140],
@@ -224,7 +236,7 @@ def main() -> int:
                 "author": "Feed Redaksi",
                 "date": published.strftime("%Y-%m-%d"),
                 "time": published.strftime("%H.%M WIB"),
-                "image": image or fallback_image,
+                "image": image or "",
                 "caption": caption,
                 "body": (description if len(description) >= 45 else excerpt) + "\n\nSorotan ini diimpor otomatis dari feed berita publik dan belum melalui verifikasi redaksional manual. Buka tautan sumber untuk laporan lengkap, konteks, dan pembaruan terbaru.",
                 "sourceName": source_name or "Google News RSS",
