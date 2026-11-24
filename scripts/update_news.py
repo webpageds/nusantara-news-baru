@@ -227,6 +227,7 @@ def main() -> int:
             next_cursor = 0
         if rows:
             rows[0]["_imageRepairCursor"] = next_cursor
+            rows[0]["_imageRepairLastBatch"] = len(batch)
     if repaired:
         print(f"Repaired {repaired} existing article image(s).")
 
