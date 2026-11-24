@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import email.utils
+from html.parser import HTMLParser
 import html
 import json
 import re
@@ -19,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 NEWS_PATH = ROOT / "data" / "news.json"
 TZ = ZoneInfo("Asia/Jakarta")
 MAX_NEW_PER_RUN = 5
+MAX_REPAIR_PER_RUN = 25
 FEEDS = {
     "Nasional": "berita nasional Indonesia when:1d",
     "Daerah": "berita daerah Indonesia when:1d",
@@ -69,21 +71,66 @@ def parse_date(value: str) -> dt.datetime:
     except Exception:
         return dt.datetime.now(TZ)
 
-def item_image(item: ET.Element) -> str | None:
-    """Extract a publisher-provided lead image from RSS metadata or description."""
+class _MetaImageParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.image = None
+
+    def handle_starttag(self, tag, attrs):
+        if tag.lower() != "meta":
+            return
+        values = {str(k).lower(): str(v) for k, v in attrs if k and v}
+        key = (values.get("property") or values.get("name") or "").lower()
+        if key in ("og:image", "og:image:url", "twitter:image", "twitter:image:src"):
+            candidate = values.get("content", "").strip()
+            if candidate.startswith(("https://", "http://")):
+                self.image = candidate
+
+
+def publisher_page_image(url: str) -> str | None:
+    """Resolve a news link and read its publisher-provided Open Graph image."""
+    if not url.startswith(("https://", "http://")):
+        return None
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={
+                "User-Agent": "Mozilla/5.0 (compatible; NusantaraNewsBot/1.0)",
+                "Accept": "text/html,application/xhtml+xml",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=12) as response:
+            final_url = response.geturl()
+            content_type = response.headers.get("Content-Type", "")
+            if "html" not in content_type.lower():
+                return None
+            html_bytes = response.read(1_500_000)
+        parser = _MetaImageParser()
+        parser.feed(html_bytes.decode("utf-8", errors="replace"))
+        if parser.image:
+            image_url = urllib.parse.urljoin(final_url, parser.image)
+            if image_url.startswith(("https://", "http://")):
+                return image_url
+    except Exception as exc:
+        print(f"[warn] cannot read publisher image from {url}: {exc}")
+    return None
+
+
+def item_image(item: ET.Element, article_url: str = "") -> str | None:
+    """Prefer publisher RSS image metadata, then publisher page og:image."""
     for elem in item.iter():
         tag = elem.tag.lower()
         if tag.endswith("}content") or tag.endswith("}thumbnail") or tag.endswith("enclosure"):
-            url = (elem.attrib.get("url") or elem.attrib.get("href") or "").strip()
-            if url.startswith("https://") and re.search(r"\\.(jpg|jpeg|png|webp|avif)(\\?|$)", url, re.I):
-                return url
+            candidate = (elem.attrib.get("url") or elem.attrib.get("href") or "").strip()
+            if candidate.startswith(("https://", "http://")):
+                return candidate
     desc = html.unescape(item.findtext("description") or "")
     match = re.search(r"""<img\b[^>]+(?:src|data-src)=["']([^"']+)["']""", desc, re.I)
     if match:
         candidate = html.unescape(match.group(1)).strip()
-        if candidate.startswith("https://"):
+        if candidate.startswith(("https://", "http://")):
             return candidate
-    return None
+    return publisher_page_image(article_url) if article_url else None
 
 def request_feed(query: str) -> list[ET.Element]:
     params = urllib.parse.urlencode({"q": query, "hl": "id", "gl": "ID", "ceid": "ID:id"})
@@ -108,6 +155,27 @@ def main() -> int:
     known_slugs = {a.get("slug") for a in rows}
     candidates: list[dict] = []
     now = dt.datetime.now(TZ)
+
+    # Repair old automatically imported cards that still use generic stock photos.
+    repaired = 0
+    for article in rows:
+        if repaired >= MAX_REPAIR_PER_RUN:
+            break
+        if not article.get("autoImported"):
+            continue
+        current_image = str(article.get("image") or "")
+        if "images.unsplash.com" not in current_image and current_image:
+            continue
+        source_url = str(article.get("sourceUrl") or "")
+        if not source_url:
+            continue
+        actual_image = publisher_page_image(source_url)
+        if actual_image:
+            article["image"] = actual_image
+            article["caption"] = f"Foto utama dari penerbit {article.get('sourceName', 'sumber berita')}; periksa kredit pada artikel asli."
+            repaired += 1
+    if repaired:
+        print(f"Repaired {repaired} existing article image(s).")
 
     for category, query in FEEDS.items():
         try:
@@ -145,8 +213,8 @@ def main() -> int:
                 suffix += 1
             known_titles.add(normalized)
             known_slugs.add(slug)
-            image = item_image(item)
-            caption = f"Gambar ilustrasi kategori {category}; bukan foto langsung peristiwa." if not image else "Gambar dari feed sumber; periksa keterangan sumber untuk konteks foto."
+            image = item_image(item, link)
+            caption = f"Ilustrasi kategori {category}; foto utama dari penerbit tidak tersedia." if not image else f"Foto dari penerbit {source_name}; periksa kredit pada artikel asli."
             fallback_image = choose_fallback_image(category) if image is None else None
             candidates.append({
                 "slug": slug,
@@ -168,14 +236,14 @@ def main() -> int:
 
     candidates.sort(key=lambda a: (a["date"], a["time"]), reverse=True)
     additions = candidates[:MAX_NEW_PER_RUN]
-    if not additions:
-        print("No new headlines found; leaving news.json unchanged.")
+    if not additions and not repaired:
+        print("No new headlines or image repairs found; leaving news.json unchanged.")
         return 0
     existing = {a.get("slug") for a in rows}
     additions = [a for a in additions if a.get("slug") not in existing]
     rows = additions + rows
     NEWS_PATH.write_text(json.dumps(rows, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(f"Imported {len(additions)} headline(s); total articles: {len(rows)}.")
+    print(f"Imported {len(additions)} headline(s), repaired {repaired} image(s); total articles: {len(rows)}.")
     return 0
 
 if __name__ == "__main__":
