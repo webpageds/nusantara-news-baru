@@ -148,8 +148,6 @@ def main() -> int:
             image = item_image(item)
             caption = f"Gambar ilustrasi kategori {category}; bukan foto langsung peristiwa." if not image else "Gambar dari feed sumber; periksa keterangan sumber untuk konteks foto."
             fallback_image = choose_fallback_image(category) if image is None else None
-            if fallback_image:
-                used_fallback_images.add(fallback_image)
             candidates.append({
                 "slug": slug,
                 "title": raw_title[:140],
