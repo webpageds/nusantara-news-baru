@@ -13,6 +13,7 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 NEWS_PATH = ROOT / "data" / "news.json"
+OPINION_PATH = ROOT / "data" / "opinions.json"
 TEMPLATE_PATH = ROOT / "article.html"
 SITE_URL = os.environ.get("SITE_URL", "https://nusantaranewsidn.com").rstrip("/")
 SITEMAP_PATH = ROOT / "sitemap.xml"
@@ -158,6 +159,14 @@ def main() -> int:
     except (OSError, json.JSONDecodeError, ValueError) as exc:
         print(f"[error] Cannot safely read existing news.json: {exc}")
         return 1
+    if OPINION_PATH.exists():
+        try:
+            opinion_rows = json.loads(OPINION_PATH.read_text(encoding="utf-8"))
+            if isinstance(opinion_rows, list):
+                feed_rows.extend(opinion_rows)
+                print(f"Loaded {len(opinion_rows)} editorial opinion(s).")
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"[warn] Could not read opinions.json: {exc}")
     supabase_rows = fetch_supabase_articles()
     # Prefer the live Supabase row when a slug appears in both sources.
     by_slug = {
