@@ -13,7 +13,9 @@
     "sourceName": "Bela Rakyat",
     "sourceUrl": "https://www.google-analytics.com/analytics.js",
     "status": "Published",
-    "autoImported": true
+    "autoImported": true,
+    "_imageRepairCursor": 25,
+    "_imageRepairLastBatch": 25
   },
   {
     "slug": "ruang-kreatif-seni-pertunjukan-2026-tampilkan-cerita-rakyat-bali-lewat-wayang-kreasi",
