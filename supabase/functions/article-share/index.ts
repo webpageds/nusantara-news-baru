@@ -8,8 +8,28 @@ function esc(value: unknown): string {
   }[c] as string));
 }
 function safeImage(value: unknown): string {
-  try { const image = new URL(String(value ?? "")); return image.protocol === "https:" ? image.href : FALLBACK_IMAGE; }
-  catch { return FALLBACK_IMAGE; }
+  try {
+    const image = new URL(String(value ?? ""));
+    if (image.protocol !== "https:" || !image.hostname) return FALLBACK_IMAGE;
+    // Blogger/Blogspot uploads and public Supabase Storage URLs are direct image hosts.
+    // Keep the complete URL (including Blogger's sizing parameters) for WhatsApp crawlers.
+    const host = image.hostname.toLowerCase();
+    const directImageHost = host === "blogger.googleusercontent.com" ||
+      host === "bp.blogspot.com" || host.endsWith(".blogspot.com") ||
+      host.endsWith(".supabase.co");
+    const ext = image.pathname.toLowerCase().split(".").pop() || "";
+    const knownImage = ["jpg", "jpeg", "png", "webp", "avif", "gif"].includes(ext);
+    if (!directImageHost && !knownImage && !image.pathname.includes("/storage/v1/object/public/")) return FALLBACK_IMAGE;
+    return image.href;
+  } catch { return FALLBACK_IMAGE; }
+}
+function imageMime(value: string): string {
+  const path = new URL(value).pathname.toLowerCase();
+  if (path.endsWith(".png")) return "image/png";
+  if (path.endsWith(".webp")) return "image/webp";
+  if (path.endsWith(".avif")) return "image/avif";
+  if (path.endsWith(".gif")) return "image/gif";
+  return "image/jpeg";
 }
 Deno.serve(async request => {
   if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method not allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
@@ -36,7 +56,7 @@ Deno.serve(async request => {
   // GitHub Pages is static: a newly published Supabase article may not have its\n  // /artikel/{slug}/ file until the scheduled page builder runs. Send readers\n  // to the live Supabase-backed article page immediately; keep the canonical\n  // URL in Open Graph metadata for the generated static page.\n  const landingUrl = SITE_URL + "/article.html?slug=" + encodeURIComponent(article.slug);
   const html = `<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(title)} | NusantaraNews</title><meta name="description" content="${esc(description)}"><link rel="canonical" href="${esc(articleUrl)}">
-<meta property="og:type" content="article"><meta property="og:site_name" content="NusantaraNews"><meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(description)}"><meta property="og:url" content="${esc(articleUrl)}"><meta property="og:image" content="${esc(image)}"><meta property="og:image:secure_url" content="${esc(image)}"><meta property="og:image:alt" content="${esc(title)}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
+<meta property="og:type" content="article"><meta property="og:site_name" content="NusantaraNews"><meta property="og:title" content="${esc(title)}"><meta property="og:description" content="${esc(description)}"><meta property="og:url" content="${esc(articleUrl)}"><meta property="og:image" content="${esc(image)}"><meta property="og:image:secure_url" content="${esc(image)}"><meta property="og:image:alt" content="${esc(title)}"><meta property="og:image:type" content="${imageMime(image)}"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${esc(title)}"><meta name="twitter:description" content="${esc(description)}"><meta name="twitter:image" content="${esc(image)}"><meta http-equiv="refresh" content="0;url=${esc(landingUrl)}"></head><body><p><a href="${esc(articleUrl)}">Buka berita di NusantaraNews</a></p><script>location.replace(${JSON.stringify(landingUrl)});</script></body></html>`;
   return new Response(request.method === "HEAD" ? null : html, { status: 200, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "public, max-age=0, s-maxage=60", "X-Content-Type-Options": "nosniff", "Referrer-Policy": "strict-origin-when-cross-origin" } });
 });
