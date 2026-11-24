@@ -31,43 +31,22 @@ FEEDS = {
     "Sosial": "sosial masyarakat bantuan Indonesia when:1d",
     "Lifestyle": "gaya hidup budaya kesehatan Indonesia when:1d",
 }
-FALLBACK_IMAGES = [
-    "https://images.unsplash.com/photo-1593113598332-cd288d649433?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1516280440614-37939bbacd81?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1517649763962-0c623066013b?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1511497584788-876760111969?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1529101091764-c3526daf38fe?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1510511459019-5dead6b5f1b9?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1538805060514-97d9cc17730c?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1537996194471-e657df975ab4?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1529390079861-591de354faf5?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1566127992631-137a642a90f4?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1521791136064-7986c2920216?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1473448912268-2022ce9509d8?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1497366754035-f200968a6e72?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1516467508483-a7212febe31a?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1400&q=85",
-    "https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1400&q=85",
-]
+# Editorial fallback illustrations by category; never rotate unrelated images.
+FALLBACK_IMAGES = {
+    "Nasional": "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=1400&q=85",
+    "Daerah": "https://images.unsplash.com/photo-1519501025264-65ba15a82390?auto=format&fit=crop&w=1400&q=85",
+    "Ekonomi": "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1400&q=85",
+    "Internasional": "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1400&q=85",
+    "Politik": "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=1400&q=85",
+    "Teknologi": "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1400&q=85",
+    "Olahraga": "https://images.unsplash.com/photo-1464359982907-8f8fb5a8a1e1?auto=format&fit=crop&w=1400&q=85",
+    "Pendidikan": "https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=1400&q=85",
+    "Sosial": "https://images.unsplash.com/photo-1593113598332-cd288d649433?auto=format&fit=crop&w=1400&q=85",
+    "Lifestyle": "https://images.unsplash.com/photo-1499209974431-9dddcece7f88?auto=format&fit=crop&w=1400&q=85",
+}
 
-def choose_fallback_image(slug: str, used_images: set[str]) -> str:
-    start = sum(slug.encode("utf-8")) % len(FALLBACK_IMAGES)
-    for offset in range(len(FALLBACK_IMAGES)):
-        candidate = FALLBACK_IMAGES[(start + offset) % len(FALLBACK_IMAGES)]
-        if candidate not in used_images:
-            return candidate
-    return FALLBACK_IMAGES[start]
+def choose_fallback_image(category: str) -> str:
+    return FALLBACK_IMAGES.get(category, FALLBACK_IMAGES["Nasional"])
 
 def clean_text(value: str) -> str:
     value = re.sub(r"<(script|style)\b[^>]*>.*?</\1>", " ", value or "", flags=re.I | re.S)
@@ -91,16 +70,19 @@ def parse_date(value: str) -> dt.datetime:
         return dt.datetime.now(TZ)
 
 def item_image(item: ET.Element) -> str | None:
+    """Extract a publisher-provided lead image from RSS metadata or description."""
     for elem in item.iter():
         tag = elem.tag.lower()
         if tag.endswith("}content") or tag.endswith("}thumbnail") or tag.endswith("enclosure"):
-            url = elem.attrib.get("url", "")
-            if url.startswith("https://") and re.search(r"\.(jpg|jpeg|png|webp)(\?|$)", url, re.I):
+            url = (elem.attrib.get("url") or elem.attrib.get("href") or "").strip()
+            if url.startswith("https://") and re.search(r"\\.(jpg|jpeg|png|webp|avif)(\\?|$)", url, re.I):
                 return url
-    desc = item.findtext("description") or ""
-    match = re.search(r'<img[^>]+src=["\']([^"\']+)["\']', html.unescape(desc), re.I)
-    if match and match.group(1).startswith("https://"):
-        return match.group(1)
+    desc = html.unescape(item.findtext("description") or "")
+    match = re.search(r'<img\\b[^>]+(?:src|data-src)=["\\']([^"\\']+)["\\']', desc, re.I)
+    if match:
+        candidate = html.unescape(match.group(1)).strip()
+        if candidate.startswith("https://"):
+            return candidate
     return None
 
 def request_feed(query: str) -> list[ET.Element]:
