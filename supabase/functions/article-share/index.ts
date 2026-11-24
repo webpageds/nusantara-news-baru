@@ -24,6 +24,7 @@ function safeImage(value: unknown): string {
   } catch { return FALLBACK_IMAGE; }
 }
 function imageMime(value: string): string {
+  if (value.toLowerCase().endsWith(".svg")) return "image/svg+xml";
   const path = new URL(value).pathname.toLowerCase();
   if (path.endsWith(".png")) return "image/png";
   if (path.endsWith(".webp")) return "image/webp";
@@ -50,8 +51,9 @@ Deno.serve(async request => {
   const rows = await response.json();
   const article = Array.isArray(rows) ? rows[0] : null;
   if (!article) return new Response("Article not found", { status: 404 });
-  const title = String(article.title || "NusantaraNews"), description = String(article.excerpt || title), galleryImage = Array.isArray(article.image_urls) ? article.image_urls.find((value: unknown) => typeof value === "string" && value.startsWith("https://")) : "";
-  const image = safeImage(article.image_url || galleryImage);
+  const title = String(article.title || "NusantaraNews"), description = String(article.excerpt || title);
+  const imageCandidates = [article.image_url, ...(Array.isArray(article.image_urls) ? article.image_urls : [])];
+  const image = imageCandidates.map(safeImage).find((candidate: string) => candidate !== FALLBACK_IMAGE) || FALLBACK_IMAGE;
   const articleUrl = SITE_URL + "/artikel/" + encodeURIComponent(article.slug) + "/";
   // GitHub Pages is static: a newly published Supabase article may not have its\n  // /artikel/{slug}/ file until the scheduled page builder runs. Send readers\n  // to the live Supabase-backed article page immediately; keep the canonical\n  // URL in Open Graph metadata for the generated static page.\n  const landingUrl = SITE_URL + "/article.html?slug=" + encodeURIComponent(article.slug);
   const html = `<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
