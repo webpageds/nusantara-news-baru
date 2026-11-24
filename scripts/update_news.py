@@ -78,7 +78,7 @@ def item_image(item: ET.Element) -> str | None:
             if url.startswith("https://") and re.search(r"\\.(jpg|jpeg|png|webp|avif)(\\?|$)", url, re.I):
                 return url
     desc = html.unescape(item.findtext("description") or "")
-    match = re.search(r'<img\\b[^>]+(?:src|data-src)=["\\']([^"\\']+)["\\']', desc, re.I)
+    match = re.search(r"""<img\b[^>]+(?:src|data-src)=["']([^"']+)["']""", desc, re.I)
     if match:
         candidate = html.unescape(match.group(1)).strip()
         if candidate.startswith("https://"):
