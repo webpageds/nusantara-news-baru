@@ -14,6 +14,7 @@ on:
       - "admin/config.js"
       - "supabase/functions/article-share/**"
       - "data/news.json"
+      - "data/opinions.json"
       - "scripts/update_news.py"
       - "scripts/build_article_pages.py"
 
@@ -47,7 +48,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/news.json artikel sitemap.xml
+          git add data/news.json data/opinions.json artikel sitemap.xml
           if git diff --cached --quiet; then
             echo "No changes to publish."
           else
