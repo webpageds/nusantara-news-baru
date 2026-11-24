@@ -113,6 +113,12 @@ def publisher_page_image(url: str) -> str | None:
             return None
         if any(x in path for x in ("logo", "favicon", "icon", "avatar", "default")):
             return None
+        # Google News proxy thumbnails can be identical generic cards; require
+        # a larger publisher-origin image and reject its shared preview proxy.
+        if host.endswith("googleusercontent.com"):
+            return None
+        if re.search(r"(?:w=\d{1,3}|s0-w\d{1,3})(?:$|[&?])", image_url):
+            return None
         return image_url
     except Exception as exc:
         print(f"[warn] cannot read publisher image from {publisher_url}: {exc}")
