@@ -17,6 +17,7 @@ on:
       - "data/opinions.json"
       - "scripts/update_news.py"
       - "scripts/build_article_pages.py"
+      - ".github/workflows/refresh-news.yml"
 
 permissions:
   contents: write
