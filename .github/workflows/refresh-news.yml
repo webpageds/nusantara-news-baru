@@ -23,7 +23,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: refresh-nusantara-news
+  group: refresh-nusantara-news-images-v2
   cancel-in-progress: false
 
 jobs:
