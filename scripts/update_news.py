@@ -22,12 +22,33 @@ NEWS_PATH = ROOT / "data" / "news.json"
 TZ = ZoneInfo("Asia/Jakarta")
 MAX_NEW_PER_RUN = 5
 MAX_REPAIR_PER_RUN = 20
-MAX_GOOGLE_URL_RESOLUTIONS_PER_RUN = 1
+# Resolve several publisher pages on each scheduled run, while reserving most
+# of the budget for current RSS headlines instead of exhausting it on old rows.
+MAX_GOOGLE_URL_RESOLUTIONS_PER_RUN = 15
+RESERVED_FEED_URL_RESOLUTIONS = 10
 _GOOGLE_URL_RESOLUTION_COUNT = 0
 _GOOGLE_URL_CACHE: dict[str, str] = {}
 
 # Source-verified article media for the exact items visible in the homepage report.
 PINNED_ARTICLE_MEDIA = {
+    "bupati-ardiansyah-bangga-wakil-kutim-juara-umum-duta-budaya-indonesia-2026": {
+        "sourceName": "Media Kaltim",
+        "sourceUrl": "https://mediakaltim.com/dara-dan-nizar-taklukkan-panggung-nasional-batik-wakaroros-kutim-bikin-ardiansyah-bangga/",
+        "image": "https://mediakaltim.com/wp-content/uploads/2026/11/WhatsApp-Image-2026-11-26-at-23.15.52-696x482.jpeg",
+        "caption": "Foto Ramlah/Media Kaltim — Bupati Kutai Timur Ardiansyah Sulaiman bersama Dara dan Nizar, Duta Budaya Kutim 2026",
+    },
+    "bupati-sinjai-serahkan-bantuan-sembako-presiden-kepada-keluarga-pra-sejahtera": {
+        "sourceName": "Humas Sinjai",
+        "sourceUrl": "https://humas.sinjaikab.go.id/v1/post/bupati-sinjai-serahkan-paket-sembako-bantuan-presiden-ri",
+        "image": "https://humas.sinjaikab.go.id/v1/uploads/posts/2026/11/732dd47c8d05c9d5.jpg",
+        "caption": "Foto Humas Sinjai — Bupati Sinjai menyerahkan paket sembako bantuan Presiden RI kepada warga prasejahtera, 27 November 2026",
+    },
+    "ingin-kuliah-tanpa-terbebani-biaya-unm-kampus-rawamangun-hadirkan-beragam-beasiswa": {
+        "sourceName": "NusamandiriNews",
+        "sourceUrl": "https://news.nusamandiri.ac.id/berita/unm-rawamangun-perluas-akses-pendidikan-lewat-beasiswa/",
+        "image": "https://news.nusamandiri.ac.id/wp-content/uploads/2026/10/Program-Beasiswa.jpg",
+        "caption": "Foto NusamandiriNews — Seminar Pemuda Mandiri yang membahas akses pendidikan dan program beasiswa UNM Rawamangun",
+    },
     "tokenisasi-saham-cara-kerja-contoh-dan-risikonya": {
         "sourceName": "Gotrade Indonesia",
         "sourceUrl": "https://www.heygotrade.com/id/edukasi/tokenisasi-saham/",
@@ -610,9 +631,21 @@ def main() -> int:
             actual_image = None
             if source_url:
                 source_host = (urllib.parse.urlsplit(source_url).hostname or "").lower()
-                # Leave Google News redirects to the live-feed matcher below so
-                # the limited decoder budget prioritizes currently visible stories.
-                if not source_host.endswith("news.google.com"):
+                if source_host.endswith("news.google.com"):
+                    # Gradually convert older Google News wrapper links into
+                    # direct publisher URLs, but reserve capacity for current RSS.
+                    repair_limit = MAX_GOOGLE_URL_RESOLUTIONS_PER_RUN - RESERVED_FEED_URL_RESOLUTIONS
+                    if _GOOGLE_URL_RESOLUTION_COUNT < repair_limit:
+                        resolved_url = resolve_publisher_url(source_url)
+                        if resolved_url:
+                            source_url = resolved_url
+                            article["sourceUrl"] = resolved_url
+                            repaired += 1
+                        else:
+                            source_url = ""
+                    else:
+                        source_url = ""
+                if source_url:
                     actual_image = publisher_page_image(source_url)
             existing_image = str(article.get("image") or "").strip()
             if actual_image and existing_image != actual_image:
