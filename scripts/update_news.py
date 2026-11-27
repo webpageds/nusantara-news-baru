@@ -194,6 +194,7 @@ class _PublisherLinkParser(HTMLParser):
 _TRACKING_HOSTS = (
     "google-analytics.com", "googletagmanager.com", "googlesyndication.com",
     "doubleclick.net", "adservice.google.com", "hotjar.com",
+    "fonts.googleapis.com", "fonts.gstatic.com", "w3.org",
 )
 
 
@@ -287,8 +288,8 @@ def resolve_publisher_url(url: str) -> str:
                         first = cookie.split(";", 1)[0].strip()
                         if first and "=" in first:
                             cookies.append(first)
-                signature_match = re.search(r'data-n-a-sg=["\\']([^"\\']+)["\\']', page)
-                timestamp_match = re.search(r'data-n-a-ts=["\\'](\\d+)["\\']', page)
+                signature_match = re.search(r"""data-n-a-sg=["']([^"']+)["']""", page)
+                timestamp_match = re.search(r"""data-n-a-ts=["'](\d+)["']""", page)
                 if signature_match and timestamp_match:
                     signature = signature_match.group(1)
                     timestamp = timestamp_match.group(1)
@@ -323,6 +324,7 @@ def resolve_publisher_url(url: str) -> str:
             "Origin": "https://news.google.com",
             "Referer": page_url,
             "X-Same-Domain": "1",
+            "Cookie": "; ".join(dict.fromkeys(cookies)),
         }
         request = urllib.request.Request(
             "https://news.google.com/_/DotsSplashUi/data/batchexecute?rpcids=Fbv4je",
@@ -333,7 +335,8 @@ def resolve_publisher_url(url: str) -> str:
         with urllib.request.urlopen(request, timeout=15) as response:
             raw_response = response.read(1000000).decode("utf-8", errors="replace")
 
-        response_json = raw_response.split("\\n\\n", 1)[-1].strip()
+        response_parts = re.split(r"\r?\n\r?\n", raw_response, maxsplit=1)
+        response_json = response_parts[-1].strip()
         if response_json.startswith(")]}'"):
             response_json = response_json[4:].lstrip()
         frames = json.loads(response_json)
@@ -490,7 +493,7 @@ def main() -> int:
             continue
         image = str(article.get("image") or "").strip()
         image_host = (urllib.parse.urlsplit(image).hostname or "").lower() if image else ""
-        if image_host in ("images.unsplash.com", "lh3.googleusercontent.com"):
+        if image_host in ("images.unsplash.com", "lh3.googleusercontent.com", "www.w3.org", "w3.org"):
             article["image"] = ""
             article["caption"] = "Foto utama penerbit sedang dicari ulang; foto generik tidak digunakan."
             repaired += 1
