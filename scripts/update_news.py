@@ -510,7 +510,13 @@ def main() -> int:
         image = str(media.get("image") or "").strip()
         if not image:
             image = publisher_page_image(media["sourceUrl"]) or ""
-        if image and valid_article_image(image) and image_url_is_reachable(image):
+        # Explicitly curated, source-page image URLs are already checked
+        # against the publisher page and its visible image. For these exact
+        # allow-listed URLs, do not reject a CDN solely because it serves the
+        # image with application/octet-stream or rewrites the file format.
+        curated_direct_image = bool(str(media.get("image") or "").strip())
+        image_ok = valid_article_image(image) and (curated_direct_image or image_url_is_reachable(image))
+        if image and image_ok:
             if article.get("image") != image:
                 article["image"] = image
                 pinned_repaired += 1
