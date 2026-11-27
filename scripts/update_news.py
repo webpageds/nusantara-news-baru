@@ -284,7 +284,7 @@ def resolve_publisher_url(url: str) -> str:
         timestamp = timestamp_match.group(1)
         # This is the current garturlreq payload observed in Google's own page.
         inner = (
-            '["garturlreq",[["X","X",["X","X"],null,null,1,1,"ID:id",null,1,'
+            '["garturlreq",[["X","X",["X","X"],null,null,1,1,"US:en",null,1,'
             'null,null,null,null,null,0,1],"X","X",1,[1,1,1],1,1,null,0,0,null,0],'
             + json.dumps(article_id) + "," + timestamp + "," + json.dumps(signature) + "]"
         )
@@ -297,17 +297,25 @@ def resolve_publisher_url(url: str) -> str:
             "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
         }
         post_request = urllib.request.Request(
-            "https://news.google.com/_/DotsSplashUi/data/batchexecute?rpcids=Fbv4je",
+            "https://news.google.com/_/DotsSplashUi/data/batchexecute",
             data=body,
             headers=post_headers,
         )
         with urllib.request.urlopen(post_request, timeout=12) as response:
             raw_response = response.read(1000000).decode("utf-8", errors="replace")
 
-        split = raw_response.split("\n\n", 1)
-        if len(split) < 2:
-            raise ValueError("Google News batchexecute returned no response frame")
-        frames = json.loads(split[1])
+        # Google sometimes returns an XSSI-prefixed frame without a blank-line
+        # separator. Accept both the blank-line and direct JSON-array formats.
+        clean_response = raw_response.lstrip()
+        if clean_response.startswith(")]}'"):
+            clean_response = clean_response[4:].lstrip()
+        try:
+            frames = json.loads(clean_response)
+        except json.JSONDecodeError:
+            first_array = clean_response.find("[")
+            if first_array < 0:
+                raise ValueError("Google News batchexecute response contained no JSON array: " + clean_response[:220])
+            frames, _ = json.JSONDecoder().raw_decode(clean_response[first_array:])
         row = frames[0][2] if isinstance(frames, list) and frames and isinstance(frames[0], list) and len(frames[0]) > 2 else None
         if not row:
             print(f"[warn] Google News returned an empty publisher URL for {article_id[:18]}.")
