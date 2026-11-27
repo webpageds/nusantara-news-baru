@@ -661,6 +661,7 @@ def main() -> int:
                 article["image"] = image
                 pinned_repaired += 1
             article["imageIsIllustration"] = False
+            used_image_urls.add(image)
         else:
             article["image"] = ""
     if pinned_repaired:
