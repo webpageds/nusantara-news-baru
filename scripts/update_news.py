@@ -372,6 +372,8 @@ def valid_article_image(url: str) -> bool:
         host, path = (parts.hostname or "").lower(), parts.path.lower()
         if parts.scheme != "https" or not host or not path:
             return False
+        if host in ("www.w3.org", "w3.org", "fonts.googleapis.com", "fonts.gstatic.com"):
+            return False
 
         blogger_host = (
             host == "blogger.googleusercontent.com"
