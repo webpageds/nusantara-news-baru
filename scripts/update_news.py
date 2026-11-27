@@ -61,19 +61,49 @@ def parse_date(value: str) -> dt.datetime:
         return dt.datetime.now(TZ)
 
 class _MetaImageParser(HTMLParser):
+    """Collect publisher-declared article images in preferred metadata order."""
+    PRIORITY = {
+        "og:image": 0,
+        "og:image:url": 1,
+        "og:image:secure_url": 2,
+        "twitter:image": 3,
+        "twitter:image:src": 4,
+        "image": 5,
+    }
+
     def __init__(self):
         super().__init__()
-        self.image = None
+        self.images: list[tuple[int, int, str]] = []
+        self._sequence = 0
 
     def handle_starttag(self, tag, attrs):
-        if tag.lower() != "meta":
-            return
         values = {str(k).lower(): str(v) for k, v in attrs if k and v}
-        key = (values.get("property") or values.get("name") or "").lower()
-        if key in ("og:image", "og:image:url", "twitter:image", "twitter:image:src"):
-            candidate = values.get("content", "").strip()
-            if candidate.startswith(("https://", "http://")):
-                self.image = candidate
+        tag = tag.lower()
+        candidate = ""
+
+        if tag == "meta":
+            key = (values.get("property") or values.get("name") or values.get("itemprop") or "").lower()
+            if key in self.PRIORITY:
+                candidate = values.get("content", "").strip()
+                priority = self.PRIORITY[key]
+            else:
+                return
+        elif tag == "link" and "image_src" in (values.get("rel") or "").lower().split():
+            candidate = values.get("href", "").strip()
+            priority = 6
+        else:
+            return
+
+        if candidate and not candidate.lower().startswith(("data:", "javascript:")):
+            self.images.append((priority, self._sequence, candidate))
+            self._sequence += 1
+
+    def ordered_images(self):
+        seen = set()
+        for _, _, candidate in sorted(self.images):
+            if candidate not in seen:
+                seen.add(candidate)
+                yield candidate
 
 
 def resolve_publisher_url(url: str) -> str:
@@ -116,17 +146,45 @@ def resolve_publisher_url(url: str) -> str:
 
 
 def valid_article_image(url: str) -> bool:
-    """Reject generic logos, avatars, Google thumbnails and tiny preview images."""
+    """Accept direct publisher images, including extensionless Blogger CDN URLs.
+
+    Do not accept Google's generic search/news thumbnails: those can be shared
+    across unrelated stories. Blogger's dedicated image host is an exception
+    because it serves the original uploaded image bytes.
+    """
     try:
-        parts = urllib.parse.urlsplit(url)
-        host, path = parts.netloc.lower(), parts.path.lower()
-        if parts.scheme != "https" or not host:
+        raw = html.unescape(str(url or "")).strip()
+        if raw.startswith("//"):
+            raw = "https:" + raw
+        elif raw.lower().startswith("http://"):
+            raw = "https://" + raw[7:]
+        parts = urllib.parse.urlsplit(raw)
+        host, path = (parts.hostname or "").lower(), parts.path.lower()
+        if parts.scheme != "https" or not host or not path:
             return False
-        if host.endswith(("google.com", "googleusercontent.com", "gstatic.com")):
+
+        blogger_host = (
+            host == "blogger.googleusercontent.com"
+            or host == "blogspot.com"
+            or host.endswith(".blogspot.com")
+        )
+        # Do not broadly allow googleusercontent.com: only Blogger's dedicated
+        # CDN is considered a trustworthy original-image host.
+        if (host.endswith(("google.com", "gstatic.com", "googleusercontent.com")) and not blogger_host):
             return False
-        if any(token in path for token in ("logo", "favicon", "icon", "avatar", "default", "placeholder")):
+        if host.endswith(("news.google.com", "google.co", "googleusercontent.com")) and not blogger_host:
             return False
-        if re.search(r"(?:w|width|sz)=\d{1,3}(?:&|$)", parts.query):
+        if any(token in path for token in (
+            "logo", "favicon", "avatar", "placeholder", "no-image",
+            "no_image", "default-image", "default_image", "sprite"
+        )):
+            return False
+        # Reject clearly tiny thumbnail variants, but preserve full-size Blogger
+        # paths such as /s1600/ and publisher URLs with w=1200.
+        size_match = re.search(r"(?:[?&](?:w|width|sz)=|[=/]w)(\d{1,4})(?:[&#/]|$)", raw.lower())
+        if size_match and int(size_match.group(1)) < 200:
+            return False
+        if re.search(r"/(?:s|w|h)\d{1,3}(?:-[a-z]+)?/", path) and not blogger_host:
             return False
         return True
     except Exception:
@@ -149,8 +207,10 @@ def publisher_page_image(url: str) -> str | None:
             html_bytes = response.read(1800000)
         parser = _MetaImageParser()
         parser.feed(html_bytes.decode("utf-8", errors="replace"))
-        if parser.image:
-            candidate = urllib.parse.urljoin(final_url, parser.image)
+        # Prefer the publisher's OG hero image, then its Twitter/itemprop image.
+        # Resolve relative and protocol-relative URLs against the final article URL.
+        for raw_candidate in parser.ordered_images():
+            candidate = urllib.parse.urljoin(final_url, raw_candidate)
             if valid_article_image(candidate):
                 return candidate
     except Exception as exc:
@@ -214,13 +274,17 @@ def main() -> int:
             if not source_url:
                 continue
             actual_image = publisher_page_image(source_url)
-            if actual_image and article.get("image") != actual_image:
+            existing_image = str(article.get("image") or "").strip()
+            if actual_image and existing_image != actual_image:
                 article["image"] = actual_image
                 article["caption"] = f"Foto artikel dari penerbit {article.get('sourceName', 'sumber berita')}; kredit mengikuti sumber asli."
                 repaired += 1
-            elif not actual_image and article.get("image"):
+            elif not actual_image and existing_image and not valid_article_image(existing_image):
+                # Remove known proxy thumbnails or broken placeholders only.
+                # Keep existing direct publisher images when the source temporarily
+                # blocks our metadata fetch, so a transient network issue cannot erase a good photo.
                 article["image"] = ""
-                article["caption"] = "Foto artikel belum dapat diverifikasi dari penerbit; gambar tidak ditampilkan."
+                article["caption"] = "Foto asli belum dapat diverifikasi dari penerbit; gambar tidak ditampilkan sementara."
                 repaired += 1
         next_cursor = repair_cursor + len(batch)
         if next_cursor >= len(imported_indexes):
