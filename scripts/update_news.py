@@ -331,7 +331,7 @@ def valid_article_image(url: str) -> bool:
 
 
 def image_url_is_reachable(url: str) -> bool:
-    """Verify image bytes without relying on HTTP Range support."""
+    """Verify the candidate serves image bytes; avoid Range requests unsupported by CDNs."""
     try:
         req = urllib.request.Request(url, headers={
             "User-Agent": "Mozilla/5.0 (compatible; NusantaraNewsBot/1.0)",
@@ -340,14 +340,10 @@ def image_url_is_reachable(url: str) -> bool:
         with urllib.request.urlopen(req, timeout=8) as response:
             content_type = str(response.headers.get("Content-Type", "")).lower()
             sample = response.read(32)
-            signature = (
-                sample.startswith(b"\\xff\\xd8\\xff")
-                or sample.startswith(b"\\x89PNG\\r\\n\\x1a\\n")
-                or sample.startswith((b"GIF87a", b"GIF89a", b"RIFF"))
-            )
-            return bool(sample) and (content_type.startswith("image/") or signature)
+            return bool(sample) and content_type.startswith("image/")
     except Exception:
         return False
+
 
 def publisher_page_image(url: str) -> str | None:
     """Read the publisher article's image metadata, rejecting generic graphics."""
