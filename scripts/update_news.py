@@ -46,6 +46,12 @@ PINNED_ARTICLE_MEDIA = {
         "image": "",
         "caption": "Foto Humas Kemenag Aceh Besar — Kakankemenag bersama peserta OMI Riset dan Sains di Asrama Haji Pondok Gede, 26 November 2026",
     },
+    "bisnis-antarnegara-makin-ramai-pembayaran-global-naik-40-pada-semester-i-2026-ini-pendorongn": {
+        "sourceName": "KONTAN",
+        "sourceUrl": "https://keuangan.kontan.co.id/news/citi-catat-transaksi-pembayaran-global-naik-40-asia-jadi-motor-pertumbuhan",
+        "image": "https://foto.kontan.co.id/8uUTBeoogZGbwyeB1f_4MkHeOjA%3D/smart/filters%3Aformat%28webp%29/2026/11/20/644485448.jpg",
+        "caption": "Ilustrasi logo Citi — Reuters/Dado Ruvic, via KONTAN",
+    },
 }
 FEEDS = {
     "Nasional": "berita nasional Indonesia when:1d",
