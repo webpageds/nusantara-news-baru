@@ -287,7 +287,6 @@ def main() -> int:
                 article["caption"] = "Foto asli belum dapat diverifikasi dari penerbit; gambar tidak ditampilkan sementara."
                 repaired += 1
         next_cursor = (repair_cursor + len(batch)) % max(1, len(imported_indexes))
-            rows[0]["_imageRepairLastBatch"] = len(batch)
     if repaired:
         print(f"Repaired {repaired} existing article image(s).")
 
