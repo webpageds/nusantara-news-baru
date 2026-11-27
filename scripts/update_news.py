@@ -261,7 +261,7 @@ def main() -> int:
     # Repair imported cards in batches; re-check every feed photo because some
     # old entries point to Google News proxy thumbnails shared across stories.
     repaired = 0
-    repair_cursor = int(rows[0].get("_imageRepairCursor", 0)) if rows and rows[0].get("_imageRepairCursor") else 0
+    repair_cursor = next((int(article.get("_imageRepairCursor", 0)) for article in rows if article.get("_imageRepairCursor") is not None), 0)
     imported_indexes = [i for i, article in enumerate(rows) if article.get("autoImported")]
     if imported_indexes:
         batch = imported_indexes[repair_cursor:repair_cursor + MAX_REPAIR_PER_RUN]
@@ -286,11 +286,7 @@ def main() -> int:
                 article["image"] = ""
                 article["caption"] = "Foto asli belum dapat diverifikasi dari penerbit; gambar tidak ditampilkan sementara."
                 repaired += 1
-        next_cursor = repair_cursor + len(batch)
-        if next_cursor >= len(imported_indexes):
-            next_cursor = 0
-        if rows:
-            rows[0]["_imageRepairCursor"] = next_cursor
+        next_cursor = (repair_cursor + len(batch)) % max(1, len(imported_indexes))
             rows[0]["_imageRepairLastBatch"] = len(batch)
     if repaired:
         print(f"Repaired {repaired} existing article image(s).")
@@ -363,6 +359,17 @@ def main() -> int:
     existing = {a.get("slug") for a in rows}
     additions = [a for a in additions if a.get("slug") not in existing]
     rows = additions + rows
+
+    # Keep the repair cursor attached to the first feed row after new headlines
+    # are prepended. Otherwise every new import shifts the cursor out of row 0
+    # and old image repairs can restart from the beginning indefinitely.
+    if imported_indexes:
+        next_cursor = (next_cursor + len(additions)) % max(1, len(imported_indexes) + len(additions))
+        for article in rows:
+            article.pop("_imageRepairCursor", None)
+        if rows:
+            rows[0]["_imageRepairCursor"] = next_cursor
+
     NEWS_PATH.write_text(json.dumps(rows, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"Imported {len(additions)} headline(s), repaired {repaired} image(s); total articles: {len(rows)}.")
     return 0
