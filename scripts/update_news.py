@@ -537,18 +537,27 @@ def main() -> int:
     if pinned_repaired:
         print(f"Applied {pinned_repaired} source-verified article photo(s).")
 
-    # Delete the old category-based stock photos and Google News proxy thumbnails.
-    # These assets were reused across hundreds of unrelated stories.
+    # Keep a visibly labelled category illustration on imported stories
+    # when no source photo can be retrieved. Never use Google proxy thumbnails.
     repaired = 0
     for article in rows:
         if not article.get("autoImported"):
             continue
         image = str(article.get("image") or "").strip()
         image_host = (urllib.parse.urlsplit(image).hostname or "").lower() if image else ""
-        if image_host in ("images.unsplash.com", "lh3.googleusercontent.com", "www.w3.org", "w3.org"):
+        if image_host in ("lh3.googleusercontent.com", "www.w3.org", "w3.org"):
             article["image"] = ""
-            article["caption"] = "Foto utama penerbit sedang dicari ulang; foto generik tidak digunakan."
+            article["imageIsIllustration"] = False
+            article["caption"] = "Foto utama penerbit sedang dicari ulang."
             repaired += 1
+        if not str(article.get("image") or "").strip():
+            category = str(article.get("category") or "Nasional")
+            illustration = choose_fallback_image(category)
+            if illustration:
+                article["image"] = illustration
+                article["imageIsIllustration"] = True
+                article["caption"] = "Ilustrasi editorial kategori " + category + "; bukan dokumentasi langsung peristiwa. Foto utama penerbit tidak tersedia."
+                repaired += 1
         source_url = str(article.get("sourceUrl") or "").strip()
         if source_url:
             parts = urllib.parse.urlsplit(source_url)
