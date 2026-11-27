@@ -205,7 +205,7 @@ class _MetaImageParser(HTMLParser):
                 or ""
             ).strip()
             srcset = values.get("data-srcset") or values.get("srcset") or ""
-            options = re.findall(r"([^,\\s]+)\\s+(\\d+)w", srcset)
+            options = re.findall(r"([^,\s]+)\s+(\d+)w", srcset)
             if options:
                 source = max(options, key=lambda item: int(item[1]))[0]
             if not source:
