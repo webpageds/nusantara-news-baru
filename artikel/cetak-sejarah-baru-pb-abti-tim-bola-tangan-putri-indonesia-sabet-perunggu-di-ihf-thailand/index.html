@@ -90,6 +90,11 @@ function formatDate(a){if(!a.date)return "";const d=new Date(a.date+"T12:00:00")
 async function loadArticlePage(){
  const main=document.getElementById("pageMain");
  const cfg=window.NN_SUPABASE_CONFIG||{};
+ let supabaseImageMap={};
+ try{
+  const imageMapResponse=await fetch(new URL("data/supabase-article-images.json",location.pathname.includes("/artikel/")?new URL("../../",location.href):new URL("./",location.href)),{cache:"no-store"});
+  if(imageMapResponse.ok)supabaseImageMap=await imageMapResponse.json();
+ }catch(e){console.warn("Peta foto berita belum tersedia:",e);}
  let published=[], article=null;
  try{
   const dataPath=location.pathname.includes("/artikel/")?"../../data/news.json":"./data/news.json";
@@ -107,7 +112,7 @@ async function loadArticlePage(){
    if(result.error)console.warn("Pencarian artikel Supabase gagal:",result.error.message);
    if(result.data){
     const a=result.data;
-    article={slug:a.slug,title:a.title,category:a.category,excerpt:a.excerpt,body:a.body,author:a.author_name,date:(a.published_at||a.created_at||"").slice(0,10),time:"",image:a.image_url||"",caption:a.image_caption||"",imageUrls:Array.isArray(a.image_urls)?a.image_urls.slice(0,2):[],imageCaptions:Array.isArray(a.image_captions)?a.image_captions.slice(0,2):[],sourceName:a.source_name||"",sourceUrl:a.source_url||"",status:"Published",sourceSystem:"supabase"};
+    article={slug:a.slug,title:a.title,category:a.category,excerpt:a.excerpt,body:a.body,author:a.author_name,date:(a.published_at||a.created_at||"").slice(0,10),time:"",image:a.image_url||supabaseImageMap[a.slug]||"",caption:a.image_caption||"",imageUrls:Array.isArray(a.image_urls)?a.image_urls.slice(0,2):[],imageCaptions:Array.isArray(a.image_captions)?a.image_captions.slice(0,2):[],sourceName:a.source_name||"",sourceUrl:a.source_url||"",status:"Published",sourceSystem:"supabase"};
     published=published.filter(item=>item.slug!==a.slug);
     published.unshift(article);
    }
