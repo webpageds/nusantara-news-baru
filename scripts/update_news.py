@@ -304,7 +304,7 @@ def resolve_publisher_url(url: str) -> str:
         with urllib.request.urlopen(post_request, timeout=12) as response:
             raw_response = response.read(1000000).decode("utf-8", errors="replace")
 
-        split = raw_response.split("\\n\\n", 1)
+        split = raw_response.split("\n\n", 1)
         if len(split) < 2:
             raise ValueError("Google News batchexecute returned no response frame")
         frames = json.loads(split[1])
