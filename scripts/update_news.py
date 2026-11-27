@@ -65,11 +65,23 @@ FEEDS = {
     "Sosial": "sosial masyarakat bantuan Indonesia when:1d",
     "Lifestyle": "gaya hidup budaya kesehatan Indonesia when:1d",
 }
-# Never use generic stock photos as if they documented an individual article.
-FALLBACK_IMAGES = {}
+# Topic-specific editorial illustrations are used only when the publisher has
+# no usable image. They are labelled as illustrations, not event photographs.
+FALLBACK_IMAGES = {
+    "Nasional": "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=1200&h=675&q=82",
+    "Daerah": "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1200&h=675&q=82",
+    "Ekonomi": "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1200&h=675&q=82",
+    "Internasional": "https://images.unsplash.com/photo-1526778548025-fa2f459cd1b4?auto=format&fit=crop&w=1200&h=675&q=82",
+    "Politik": "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=1200&h=675&q=82",
+    "Teknologi": "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&h=675&q=82",
+    "Olahraga": "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=1200&h=675&q=82",
+    "Pendidikan": "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=1200&h=675&q=82",
+    "Sosial": "https://images.unsplash.com/photo-1531206715517-5c0ba140b2b8?auto=format&fit=crop&w=1200&h=675&q=82",
+    "Lifestyle": "https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=1200&h=675&q=82",
+}
 
 def choose_fallback_image(category: str) -> str:
-    return ""
+    return FALLBACK_IMAGES.get(str(category or "").strip(), FALLBACK_IMAGES["Nasional"])
 
 def clean_text(value: str) -> str:
     value = re.sub(r"<(script|style)\b[^>]*>.*?</\1>", " ", value or "", flags=re.I | re.S)
@@ -627,7 +639,10 @@ def main() -> int:
             known_slugs.add(slug)
             image = item_image(item, publisher_link or rss_link)
             caption = f"Foto dari penerbit {source_name}; periksa kredit pada artikel asli." if image else "Foto asli dari penerbit belum dapat diverifikasi; gambar tidak ditampilkan."
-            fallback_image = None
+            is_illustration = not bool(image)
+            if not image:
+                image = choose_fallback_image(category)
+                caption = "Ilustrasi editorial kategori " + category + "; bukan dokumentasi langsung peristiwa. Foto utama penerbit tidak tersedia."
             candidates.append({
                 "slug": slug,
                 "title": raw_title[:140],
@@ -638,6 +653,7 @@ def main() -> int:
                 "time": published.strftime("%H.%M WIB"),
                 "image": image or "",
                 "caption": caption,
+                "imageIsIllustration": is_illustration,
                 "body": (description if len(description) >= 45 else excerpt) + "\n\nSorotan ini diimpor otomatis dari feed berita publik dan belum melalui verifikasi redaksional manual. Buka tautan sumber untuk laporan lengkap, konteks, dan pembaruan terbaru.",
                 "sourceName": source_name or "Google News RSS",
                 "sourceUrl": link,
