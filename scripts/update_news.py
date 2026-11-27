@@ -201,12 +201,7 @@ def resolve_publisher_url(url: str) -> str:
 
 
 def valid_article_image(url: str) -> bool:
-    """Accept direct publisher images, including extensionless Blogger CDN URLs.
-
-    Do not accept Google's generic search/news thumbnails: those can be shared
-    across unrelated stories. Blogger's dedicated image host is an exception
-    because it serves the original uploaded image bytes.
-    """
+    """Accept plausible direct publisher images; reject generic/thumbnail assets."""
     try:
         raw = html.unescape(str(url or "")).strip()
         if raw.startswith("//"):
@@ -223,25 +218,40 @@ def valid_article_image(url: str) -> bool:
             or host == "blogspot.com"
             or host.endswith(".blogspot.com")
         )
-        # Do not broadly allow googleusercontent.com: only Blogger's dedicated
-        # CDN is considered a trustworthy original-image host.
-        if (host.endswith(("google.com", "gstatic.com", "googleusercontent.com")) and not blogger_host):
-            return False
-        if host.endswith(("news.google.com", "google.co", "googleusercontent.com")) and not blogger_host:
+        # Google-hosted search thumbnails are not publisher images. Only the
+        # dedicated Blogger CDN is allowed as a direct Google-hosted image.
+        if host.endswith(("google.com", "gstatic.com", "googleusercontent.com")) and not blogger_host:
             return False
         if any(token in path for token in (
             "logo", "favicon", "avatar", "placeholder", "no-image",
             "no_image", "default-image", "default_image", "sprite"
         )):
             return False
-        # Reject clearly tiny thumbnail variants, but preserve full-size Blogger
-        # paths such as /s1600/ and publisher URLs with w=1200.
-        size_match = re.search(r"(?:[?&](?:w|width|sz)=|[=/]w)(\d{1,4})(?:[&#/]|$)", raw.lower())
-        if size_match and int(size_match.group(1)) < 200:
-            return False
+        if re.search(r"(?:[?&](?:w|width|sz)=|[=/]w)(\d{1,4})(?:[&#/]|$)", raw.lower()):
+            match = re.search(r"(?:[?&](?:w|width|sz)=|[=/]w)(\d{1,4})(?:[&#/]|$)", raw.lower())
+            if match and int(match.group(1)) < 200:
+                return False
         if re.search(r"/(?:s|w|h)\d{1,3}(?:-[a-z]+)?/", path) and not blogger_host:
             return False
         return True
+    except Exception:
+        return False
+
+
+def image_url_is_reachable(url: str) -> bool:
+    """Check that the candidate URL really serves image bytes, not an HTML page."""
+    try:
+        req = urllib.request.Request(url, headers={
+            "User-Agent": "Mozilla/5.0 (compatible; NusantaraNewsBot/1.0)",
+            "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*;q=0.8,*/*;q=0.5",
+            "Range": "bytes=0-2047",
+        })
+        with urllib.request.urlopen(req, timeout=8) as response:
+            content_type = str(response.headers.get("Content-Type", "")).lower()
+            if not content_type.startswith("image/"):
+                return False
+            sample = response.read(32)
+            return bool(sample)
     except Exception:
         return False
 
@@ -266,7 +276,7 @@ def publisher_page_image(url: str) -> str | None:
         # Resolve relative and protocol-relative URLs against the final article URL.
         for raw_candidate in parser.ordered_images():
             candidate = urllib.parse.urljoin(final_url, raw_candidate)
-            if valid_article_image(candidate):
+            if valid_article_image(candidate) and image_url_is_reachable(candidate):
                 return candidate
     except Exception as exc:
         print(f"[warn] cannot read publisher image from {publisher_url}: {exc}")
@@ -285,7 +295,7 @@ def item_image(item: ET.Element, article_url: str = "") -> str | None:
         tag = elem.tag.lower()
         if tag.endswith("}content") or tag.endswith("}thumbnail") or tag.endswith("enclosure"):
             candidate = (elem.attrib.get("url") or elem.attrib.get("href") or "").strip()
-            if valid_article_image(candidate):
+            if valid_article_image(candidate) and image_url_is_reachable(candidate):
                 return candidate
     return None
 
