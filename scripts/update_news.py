@@ -22,7 +22,7 @@ NEWS_PATH = ROOT / "data" / "news.json"
 TZ = ZoneInfo("Asia/Jakarta")
 MAX_NEW_PER_RUN = 5
 MAX_REPAIR_PER_RUN = 10
-MAX_GOOGLE_URL_RESOLUTIONS_PER_RUN = 24
+MAX_GOOGLE_URL_RESOLUTIONS_PER_RUN = 12
 _GOOGLE_URL_RESOLUTION_COUNT = 0
 _GOOGLE_URL_CACHE: dict[str, str] = {}
 FEEDS = {
@@ -280,7 +280,7 @@ def resolve_publisher_url(url: str) -> str:
                 headers=browser_headers,
             )
             try:
-                with urllib.request.urlopen(request, timeout=15) as response:
+                with urllib.request.urlopen(request, timeout=10) as response:
                     page_url = response.geturl()
                     page = response.read(1800000).decode("utf-8", errors="replace")
                     set_cookies = response.headers.get_all("Set-Cookie") or []
@@ -332,7 +332,7 @@ def resolve_publisher_url(url: str) -> str:
             headers=post_headers,
             method="POST",
         )
-        with urllib.request.urlopen(request, timeout=15) as response:
+        with urllib.request.urlopen(request, timeout=10) as response:
             raw_response = response.read(1000000).decode("utf-8", errors="replace")
 
         response_parts = re.split(r"\r?\n\r?\n", raw_response, maxsplit=1)
@@ -428,7 +428,7 @@ def publisher_page_image(url: str) -> str | None:
             "User-Agent": "Mozilla/5.0 (compatible; NusantaraNewsBot/1.0)",
             "Accept": "text/html,application/xhtml+xml",
         })
-        with urllib.request.urlopen(req, timeout=12) as response:
+        with urllib.request.urlopen(req, timeout=8) as response:
             final_url = response.geturl()
             if "html" not in response.headers.get("Content-Type", "").lower():
                 return None
@@ -467,7 +467,7 @@ def request_feed(query: str) -> list[ET.Element]:
     params = urllib.parse.urlencode({"q": query, "hl": "id", "gl": "ID", "ceid": "ID:id"})
     url = "https://news.google.com/rss/search?" + params
     req = urllib.request.Request(url, headers={"User-Agent": "NusantaraNewsFeedBot/1.0"})
-    with urllib.request.urlopen(req, timeout=20) as response:
+    with urllib.request.urlopen(req, timeout=12) as response:
         xml_bytes = response.read()
     root = ET.fromstring(xml_bytes)
     channel = root.find("channel")
@@ -519,6 +519,11 @@ def main() -> int:
             source_url = str(article.get("sourceUrl") or "").strip()
             if not source_url:
                 continue
+            source_host = (urllib.parse.urlsplit(source_url).hostname or "").lower()
+            # Leave Google News redirects to the live-feed matcher below so
+            # the limited decoder budget prioritizes currently visible stories.
+            if source_host.endswith("news.google.com"):
+                continue
             actual_image = publisher_page_image(source_url)
             existing_image = str(article.get("image") or "").strip()
             if actual_image and existing_image != actual_image:
@@ -544,9 +549,13 @@ def main() -> int:
             rss_link = (item.findtext("link") or "").strip()
             if not raw_title or not rss_link.startswith(("https://", "http://")):
                 continue
+            normalized = re.sub(r"\W+", " ", raw_title.lower()).strip()
+            published = parse_date(item.findtext("pubDate") or "")
+            if published > now + dt.timedelta(minutes=10) or published < now - dt.timedelta(hours=30):
+                continue
+
             publisher_link = resolve_publisher_url(rss_link)
             link = publisher_link or rss_link
-            normalized = re.sub(r"\W+", " ", raw_title.lower()).strip()
 
             # Re-match already imported titles to current RSS entries. This
             # restores publisher URLs and hero images for records whose sourceUrl
@@ -562,9 +571,6 @@ def main() -> int:
                         existing["image"] = actual_image
                         existing["caption"] = f"Foto utama dari penerbit {source_name}; kredit mengikuti sumber asli."
                         repaired += 1
-                continue
-            published = parse_date(item.findtext("pubDate") or "")
-            if published > now + dt.timedelta(minutes=10) or published < now - dt.timedelta(hours=30):
                 continue
             description = clean_text(item.findtext("description") or "")
             if description.lower().startswith(raw_title.lower()):
