@@ -698,14 +698,13 @@ def main() -> int:
         for index in batch:
             article = rows[index]
             source_url = str(article.get("sourceUrl") or "").strip()
-            if not source_url:
-                continue
-            source_host = (urllib.parse.urlsplit(source_url).hostname or "").lower()
-            # Leave Google News redirects to the live-feed matcher below so
-            # the limited decoder budget prioritizes currently visible stories.
-            if source_host.endswith("news.google.com"):
-                continue
-            actual_image = publisher_page_image(source_url)
+            actual_image = None
+            if source_url:
+                source_host = (urllib.parse.urlsplit(source_url).hostname or "").lower()
+                # Leave Google News redirects to the live-feed matcher below so
+                # the limited decoder budget prioritizes currently visible stories.
+                if not source_host.endswith("news.google.com"):
+                    actual_image = publisher_page_image(source_url)
             existing_image = str(article.get("image") or "").strip()
             if actual_image and existing_image != actual_image:
                 article["image"] = actual_image
