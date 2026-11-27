@@ -274,7 +274,7 @@ def resolve_publisher_url(url: str) -> str:
                 return resolved
 
         patterns = (
-            r'https?://[^"\\s<>]+',
+            r'https?://[^"\s<>]+',
             r'(?:url|href|canonical)\s*[:=]\s*["\'](https?://[^"\']+)',
         )
         for pattern in patterns:
