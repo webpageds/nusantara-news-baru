@@ -186,6 +186,37 @@ class _MetaImageParser(HTMLParser):
         elif tag == "link" and "image_src" in (values.get("rel") or "").lower().split():
             candidate = values.get("href", "").strip()
             priority = 6
+        elif tag == "img":
+            # A number of publishers omit og:image but expose their lead photo
+            # as an actual figure/article <img>. Prefer explicitly featured,
+            # high-resolution sources and require descriptive alt text where
+            # possible so author portraits and logos are not selected.
+            classes = (values.get("class") or "").lower()
+            alt = (values.get("alt") or "").lower()
+            blocked = ("logo", "avatar", "author", "profile", "icon", "share", "social")
+            if any(word in classes or word in alt for word in blocked):
+                return
+            source = (
+                values.get("data-src")
+                or values.get("data-original")
+                or values.get("data-lazy-src")
+                or values.get("data-original-src")
+                or values.get("src")
+                or ""
+            ).strip()
+            srcset = values.get("data-srcset") or values.get("srcset") or ""
+            options = re.findall(r"([^,\\s]+)\\s+(\\d+)w", srcset)
+            if options:
+                source = max(options, key=lambda item: int(item[1]))[0]
+            if not source:
+                return
+            width = int(values.get("width", "0")) if str(values.get("width", "")).isdigit() else 0
+            if width and width < 300:
+                return
+            if not alt and not any(word in classes for word in ("hero", "featured", "article", "wp-post-image", "main-image")):
+                return
+            candidate = source
+            priority = 7 if any(word in classes for word in ("hero", "featured", "article", "wp-post-image", "main-image")) else 8
         else:
             return
         self._add_image(candidate, priority)
@@ -473,6 +504,91 @@ def publisher_page_image(url: str) -> str | None:
         print(f"[warn] cannot read publisher image from {publisher_url}: {exc}")
     return None
 
+def commons_article_image(title: str, used_urls: set[str]) -> tuple[str, str] | None:
+    """Find a distinct, reusable Commons photo using the article's own headline.
+
+    The selected image is explicitly labelled as an illustration and its
+    creator/licence are retained in the caption. It is never presented as
+    documentation of the event described by the headline.
+    """
+    stop_words = {
+        "yang", "dan", "atau", "dari", "untuk", "dengan", "pada", "dalam",
+        "cara", "apa", "itu", "ini", "the", "and", "for", "from", "with",
+        "news", "berita", "terbaru", "resmi", "kini", "jadi", "hingga",
+    }
+    terms = [
+        token for token in re.findall(r"[a-z0-9]+", (title or "").lower())
+        if len(token) >= 4 and token not in stop_words
+    ]
+    if len(terms) < 2:
+        return None
+    query_terms = terms[:7]
+    params = urllib.parse.urlencode({
+        "action": "query",
+        "generator": "search",
+        "gsrsearch": "filetype:bitmap " + " ".join(query_terms),
+        "gsrnamespace": "6",
+        "gsrlimit": "12",
+        "prop": "imageinfo",
+        "iiprop": "url|extmetadata",
+        "iiurlwidth": "1200",
+        "format": "json",
+    })
+    endpoint = "https://commons.wikimedia.org/w/api.php?" + params
+    request = urllib.request.Request(endpoint, headers={
+        "User-Agent": "NusantaraNewsImageResolver/1.0 (editorial image attribution)",
+        "Accept": "application/json",
+    })
+    try:
+        with urllib.request.urlopen(request, timeout=6) as response:
+            payload = json.loads(response.read().decode("utf-8", errors="replace"))
+    except Exception as exc:
+        print(f"[warn] Commons image search failed for {title[:70]}: {exc}")
+        return None
+
+    pages = list((payload.get("query", {}).get("pages") or {}).values())
+    ranked = []
+    for page in pages:
+        file_title = str(page.get("title") or "").lower()
+        normalized = re.sub(r"[^a-z0-9]+", " ", file_title)
+        matched = [term for term in query_terms if term in normalized]
+        if len(matched) < 2:
+            continue
+        if any(word in normalized for word in ("logo", "icon", "flag icon", "map locator", "screenshot")):
+            continue
+        info_list = page.get("imageinfo") or []
+        if not info_list:
+            continue
+        info = info_list[0]
+        image_url = str(info.get("thumburl") or info.get("url") or "").strip()
+        if not image_url.startswith("https://") or image_url in used_urls:
+            continue
+        if not valid_article_image(image_url):
+            continue
+        metadata = info.get("extmetadata") or {}
+        license_name = clean_text(str((metadata.get("LicenseShortName") or {}).get("value") or ""))
+        artist = clean_text(str((metadata.get("Artist") or {}).get("value") or ""))
+        credit = clean_text(str((metadata.get("Credit") or {}).get("value") or ""))
+        if not license_name:
+            continue
+        description_url = str(info.get("descriptionurl") or "")
+        score = len(matched) * 10 + (2 if credit else 0)
+        ranked.append((score, image_url, artist, license_name, description_url, file_title))
+
+    ranked.sort(key=lambda item: item[0], reverse=True)
+    for _, image_url, artist, license_name, description_url, file_title in ranked:
+        if image_url_is_reachable(image_url):
+            used_urls.add(image_url)
+            credit_text = artist or "kontributor Wikimedia Commons"
+            caption = (
+                f"Ilustrasi editorial dari Wikimedia Commons — {credit_text}; "
+                f"lisensi {license_name}. "
+                + (f"Lihat sumber gambar: {description_url}" if description_url else "")
+            )
+            return image_url, caption
+    return None
+
+
 def item_image(item: ET.Element, article_url: str = "") -> str | None:
     """Use a reachable publisher-declared image, never a Google proxy thumbnail."""
     publisher_url = resolve_publisher_url(article_url) if article_url else ""
@@ -519,6 +635,11 @@ def main() -> int:
     # Warkop image is fetched from the official Kemenag Aceh page; no substitute
     # image is invented if the publisher page does not expose a direct photo.
     pinned_repaired = 0
+    used_image_urls = {
+        str(article.get("image") or "").strip()
+        for article in rows
+        if str(article.get("image") or "").strip()
+    }
     for article in rows:
         media = PINNED_ARTICLE_MEDIA.get(str(article.get("slug") or ""))
         if not media:
@@ -587,8 +708,16 @@ def main() -> int:
             existing_image = str(article.get("image") or "").strip()
             if actual_image and existing_image != actual_image:
                 article["image"] = actual_image
+                article["imageIsIllustration"] = False
                 article["caption"] = f"Foto utama dari penerbit {article.get('sourceName', 'sumber berita')}; kredit mengikuti sumber asli."
+                used_image_urls.add(actual_image)
                 repaired += 1
+            elif not existing_image:
+                commons_match = commons_article_image(str(article.get("title") or ""), used_image_urls)
+                if commons_match:
+                    article["image"], article["caption"] = commons_match
+                    article["imageIsIllustration"] = True
+                    repaired += 1
         next_cursor = (repair_cursor + len(batch)) % max(1, len(imported_indexes))
     if repaired:
         print(f"Cleaned/repaired {repaired} imported article image/source field(s).")
@@ -647,8 +776,13 @@ def main() -> int:
             known_titles.add(normalized)
             known_slugs.add(slug)
             image = item_image(item, publisher_link or rss_link)
-            caption = f"Foto spesifik dari penerbit {source_name}; kredit mengikuti artikel asli." if image else "Foto spesifik dari penerbit belum ditemukan; tidak diganti dengan foto kategori yang berulang."
+            caption = f"Foto spesifik dari penerbit {source_name}; kredit mengikuti artikel asli." if image else "Foto spesifik dari penerbit belum ditemukan."
             is_illustration = False
+            if not image:
+                commons_match = commons_article_image(raw_title, used_image_urls)
+                if commons_match:
+                    image, caption = commons_match
+                    is_illustration = True
             candidates.append({
                 "slug": slug,
                 "title": raw_title[:140],
