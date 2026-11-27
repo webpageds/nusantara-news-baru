@@ -22,33 +22,57 @@ def attr(value: str) -> str:
     return html.escape(str(value or ""), quote=True)
 
 def share_image(url: str) -> str:
-    """Return a public image URL suitable for Open Graph cards."""
-    if not url or not url.startswith("https://"):
-        return SITE_URL + "/assets/nusantaranews-share.svg"
+    """Return a public, direct image URL suitable for Open Graph cards.
+
+    Blogger images are often extensionless URLs served from googleusercontent.com
+    or blogspot.com. Preserve their sizing/query parameters and normalize legacy
+    HTTP/protocol-relative URLs to HTTPS so social crawlers can fetch them.
+    """
+    fallback = SITE_URL + "/assets/nusantaranews-share.svg"
+    raw = html.unescape(str(url or "")).strip()
+    if not raw:
+        return fallback
+    if raw.startswith("//"):
+        raw = "https:" + raw
+    elif raw.lower().startswith("http://"):
+        raw = "https://" + raw[7:]
+    if not raw.lower().startswith("https://"):
+        return fallback
     try:
-        parts = urlsplit(url)
-        # Blogger URLs are normally direct images; preserve the full URL so size/format query parameters remain intact.
+        parts = urlsplit(raw)
+        host = (parts.hostname or "").lower()
+        path = parts.path.lower()
+
+        # Blogger URLs are direct image bytes even when the filename has no extension.
+        blogger_cdn = (
+            host == "blogger.googleusercontent.com"
+            or host.endswith(".blogspot.com")
+            or host == "blogspot.com"
+            or (host.endswith(".googleusercontent.com") and "/img/" in path)
+        )
+        if blogger_cdn:
+            return urlunsplit(("https", parts.netloc, parts.path, parts.query, ""))
+
         # GitHub blob pages are HTML wrappers; social crawlers need the direct image bytes.
-        if parts.netloc.lower() == "github.com" and "/blob/" in parts.path:
+        if host == "github.com" and "/blob/" in parts.path:
             segments = parts.path.strip("/").split("/")
             if len(segments) >= 5 and segments[2] == "blob":
                 owner, repo, branch = segments[0], segments[1], segments[3]
                 file_path = "/".join(segments[4:])
                 return urlunsplit(("https", "raw.githubusercontent.com", f"/{owner}/{repo}/{branch}/{file_path}", "", ""))
-        if "images.unsplash.com" in parts.netloc:
+
+        if host == "images.unsplash.com":
             query = parse_qs(parts.query)
             query.update({"fit": ["crop"], "w": ["1200"], "h": ["630"], "q": ["85"]})
-            return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query, doseq=True), ""))
-        # Some hosts use extensionless direct-image URLs (notably Blogger CDN); keep recognized public image CDNs.
-        if parts.netloc.lower().endswith(("blogger.googleusercontent.com", "bp.blogspot.com", "images.unsplash.com")):
-            return url
-        if parts.path.lower().endswith((".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif")) or "/storage/v1/object/public/" in parts.path:
-            return url
-        # GitHub file blobs were rewritten above; other non-image pages are unsuitable preview images.
-        return SITE_URL + "/assets/nusantaranews-share.svg"
-    except Exception:
-        return SITE_URL + "/assets/nusantaranews-share.svg"
+            return urlunsplit(("https", parts.netloc, parts.path, urlencode(query, doseq=True), ""))
 
+        if path.endswith((".jpg", ".jpeg", ".png", ".webp", ".avif", ".gif")) or "/storage/v1/object/public/" in path:
+            return urlunsplit(("https", parts.netloc, parts.path, parts.query, ""))
+
+        # Unknown page URLs are not valid preview images.
+        return fallback
+    except Exception:
+        return fallback
 def fetch_supabase_articles() -> list[dict]:
     """Fetch only rows allowed by Supabase public SELECT/RLS for published articles."""
     config_path = ROOT / "admin" / "config.js"
