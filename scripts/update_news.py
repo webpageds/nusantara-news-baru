@@ -75,12 +75,56 @@ class _MetaImageParser(HTMLParser):
         super().__init__()
         self.images: list[tuple[int, int, str]] = []
         self._sequence = 0
+        self._jsonld_buffer: list[str] | None = None
+
+    def _add_image(self, candidate: str, priority: int):
+        candidate = str(candidate or "").strip()
+        if candidate and not candidate.lower().startswith(("data:", "javascript:")):
+            self.images.append((priority, self._sequence, candidate))
+            self._sequence += 1
+
+    def _collect_jsonld_article_images(self, node):
+        """Collect image fields only from Article/NewsArticle JSON-LD objects."""
+        if isinstance(node, list):
+            for item in node:
+                self._collect_jsonld_article_images(item)
+            return
+        if not isinstance(node, dict):
+            return
+
+        raw_types = node.get("@type", [])
+        types = [raw_types] if isinstance(raw_types, str) else raw_types
+        types = [str(item).lower() for item in types] if isinstance(types, list) else []
+        is_article = any(
+            item.endswith(("article", "newsarticle", "reportagenewsarticle", "blogposting"))
+            for item in types
+        )
+
+        if is_article:
+            def add_image_value(value):
+                if isinstance(value, str):
+                    self._add_image(value, 5)
+                elif isinstance(value, list):
+                    for child in value:
+                        add_image_value(child)
+                elif isinstance(value, dict):
+                    for key in ("url", "contentUrl"):
+                        if value.get(key):
+                            add_image_value(value[key])
+            add_image_value(node.get("image"))
+
+        for key, value in node.items():
+            if key not in ("image", "logo"):
+                self._collect_jsonld_article_images(value)
 
     def handle_starttag(self, tag, attrs):
         values = {str(k).lower(): str(v) for k, v in attrs if k and v}
         tag = tag.lower()
-        candidate = ""
+        if tag == "script" and "ld+json" in (values.get("type") or "").lower():
+            self._jsonld_buffer = []
+            return
 
+        candidate = ""
         if tag == "meta":
             key = (values.get("property") or values.get("name") or values.get("itemprop") or "").lower()
             if key in self.PRIORITY:
@@ -93,10 +137,21 @@ class _MetaImageParser(HTMLParser):
             priority = 6
         else:
             return
+        self._add_image(candidate, priority)
 
-        if candidate and not candidate.lower().startswith(("data:", "javascript:")):
-            self.images.append((priority, self._sequence, candidate))
-            self._sequence += 1
+    def handle_data(self, data):
+        if self._jsonld_buffer is not None:
+            self._jsonld_buffer.append(data)
+
+    def handle_endtag(self, tag):
+        if tag.lower() == "script" and self._jsonld_buffer is not None:
+            raw = "".join(self._jsonld_buffer).strip()
+            self._jsonld_buffer = None
+            if raw:
+                try:
+                    self._collect_jsonld_article_images(json.loads(raw))
+                except (json.JSONDecodeError, TypeError, ValueError):
+                    pass
 
     def ordered_images(self):
         seen = set()
