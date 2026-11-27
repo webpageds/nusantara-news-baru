@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import json
 import email.utils
 from html.parser import HTMLParser
 import html
@@ -20,7 +21,10 @@ ROOT = Path(__file__).resolve().parents[1]
 NEWS_PATH = ROOT / "data" / "news.json"
 TZ = ZoneInfo("Asia/Jakarta")
 MAX_NEW_PER_RUN = 5
-MAX_REPAIR_PER_RUN = 25
+MAX_REPAIR_PER_RUN = 10
+MAX_GOOGLE_URL_RESOLUTIONS_PER_RUN = 24
+_GOOGLE_URL_RESOLUTION_COUNT = 0
+_GOOGLE_URL_CACHE: dict[str, str] = {}
 FEEDS = {
     "Nasional": "berita nasional Indonesia when:1d",
     "Daerah": "berita daerah Indonesia when:1d",
@@ -229,63 +233,127 @@ def _publisher_candidate(value: str, base_url: str = "") -> str:
 
 
 def resolve_publisher_url(url: str) -> str:
-    """Resolve Google News RSS URLs without mistaking analytics assets for articles."""
+    """Resolve Google News RSS links using Google's signed article URL endpoint.
+
+    Modern Google News IDs are opaque. A page fetch provides a signature and
+    timestamp; Google's batchexecute RPC returns the actual publisher URL.
+    """
+    global _GOOGLE_URL_RESOLUTION_COUNT
     raw = html.unescape(str(url or "")).strip()
     if not raw.startswith(("https://", "http://")):
         return ""
     try:
         parts = urllib.parse.urlsplit(raw)
         host = (parts.hostname or "").lower()
-        if _is_tracking_or_google_host(host, parts.path) and not host.endswith("news.google.com"):
-            return ""
-
-        # Direct publisher URLs should not need a Google redirect lookup.
         if not host.endswith("news.google.com"):
             return _publisher_candidate(raw)
 
-        query = urllib.parse.parse_qs(parts.query)
-        for key in ("url", "u", "q"):
-            value = (query.get(key) or [""])[0]
-            candidate = _publisher_candidate(value)
-            if candidate:
-                return candidate
+        if raw in _GOOGLE_URL_CACHE:
+            return _GOOGLE_URL_CACHE[raw]
+        if _GOOGLE_URL_RESOLUTION_COUNT >= MAX_GOOGLE_URL_RESOLUTIONS_PER_RUN:
+            return ""
 
-        req = urllib.request.Request(raw, headers={
-            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/128 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        })
-        with urllib.request.urlopen(req, timeout=12) as response:
-            final_url = response.geturl()
-            content_type = str(response.headers.get("Content-Type", "")).lower()
-            if "html" not in content_type and "xml" not in content_type:
-                return _publisher_candidate(final_url)
-            html_bytes = response.read(1200000)
+        match = re.search(r"/(?:rss/)?articles/([^/?#]+)", parts.path)
+        if not match:
+            return ""
+        article_id = match.group(1)
+        _GOOGLE_URL_RESOLUTION_COUNT += 1
 
-        direct = _publisher_candidate(final_url)
-        if direct:
-            return direct
+        browser_headers = {
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9,id;q=0.8",
+            "Upgrade-Insecure-Requests": "1",
+            "Cookie": "CONSENT=PENDING+987",
+        }
 
-        page = html_bytes.decode("utf-8", errors="replace")
-        parser = _PublisherLinkParser()
-        parser.feed(page)
-        for _, candidate in sorted(parser.candidates, key=lambda item: item[0]):
-            resolved = _publisher_candidate(candidate, final_url)
-            if resolved:
-                return resolved
+        signature = ""
+        timestamp = ""
+        cookies = ["CONSENT=PENDING+987"]
+        page_url = "https://news.google.com/rss/articles/" + article_id
 
-        patterns = (
-            r'https?://[^"\s<>]+',
-            r'(?:url|href|canonical)\s*[:=]\s*["\'](https?://[^"\']+)',
+        # Google has alternated between /rss/articles/ and /articles/ pages.
+        for page_path in ("/rss/articles/", "/articles/"):
+            request = urllib.request.Request(
+                "https://news.google.com" + page_path + urllib.parse.quote(article_id, safe=""),
+                headers=browser_headers,
+            )
+            try:
+                with urllib.request.urlopen(request, timeout=15) as response:
+                    page_url = response.geturl()
+                    page = response.read(1800000).decode("utf-8", errors="replace")
+                    set_cookies = response.headers.get_all("Set-Cookie") or []
+                    for cookie in set_cookies:
+                        first = cookie.split(";", 1)[0].strip()
+                        if first and "=" in first:
+                            cookies.append(first)
+                signature_match = re.search(r'data-n-a-sg=["\\']([^"\\']+)["\\']', page)
+                timestamp_match = re.search(r'data-n-a-ts=["\\'](\\d+)["\\']', page)
+                if signature_match and timestamp_match:
+                    signature = signature_match.group(1)
+                    timestamp = timestamp_match.group(1)
+                    break
+            except Exception:
+                continue
+
+        if not signature or not timestamp:
+            print(f"[warn] Google News signature unavailable for {article_id[:18]}.")
+            _GOOGLE_URL_CACHE[raw] = ""
+            return ""
+
+        inner_payload = [
+            "garturlreq",
+            [
+                ["X", "X", ["X", "X"], None, None, 1, 1, "ID:id", None, 1,
+                 None, None, None, None, None, 0, 1],
+                "X", "X", 1, [1, 1, 1], 1, 1, None, 0, 0, None, 0,
+            ],
+            article_id,
+            int(timestamp),
+            signature,
+        ]
+        outer_payload = [[["Fbv4je", json.dumps(inner_payload, separators=(",", ":"))]]]
+        post_body = urllib.parse.urlencode({
+            "f.req": json.dumps(outer_payload, separators=(",", ":"))
+        }).encode("utf-8")
+
+        post_headers = {
+            **browser_headers,
+            "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+            "Origin": "https://news.google.com",
+            "Referer": page_url,
+            "X-Same-Domain": "1",
+        }
+        request = urllib.request.Request(
+            "https://news.google.com/_/DotsSplashUi/data/batchexecute?rpcids=Fbv4je",
+            data=post_body,
+            headers=post_headers,
+            method="POST",
         )
-        for pattern in patterns:
-            for match in re.findall(pattern, page, flags=re.I):
-                candidate = urllib.parse.unquote(html.unescape(match)).replace("\\u0026", "&").replace("\\u003d", "=")
-                resolved = _publisher_candidate(candidate, final_url)
-                if resolved:
-                    return resolved
+        with urllib.request.urlopen(request, timeout=15) as response:
+            raw_response = response.read(1000000).decode("utf-8", errors="replace")
+
+        response_json = raw_response.split("\\n\\n", 1)[-1].strip()
+        if response_json.startswith(")]}'"):
+            response_json = response_json[4:].lstrip()
+        frames = json.loads(response_json)
+        resolved = ""
+        for frame in frames if isinstance(frames, list) else []:
+            if not isinstance(frame, list) or len(frame) < 3 or frame[0] != "wrb.fr" or frame[1] != "Fbv4je" or not frame[2]:
+                continue
+            payload = json.loads(frame[2])
+            if isinstance(payload, list) and len(payload) > 1 and payload[0] == "garturlres":
+                resolved = _publisher_candidate(str(payload[1]))
+                break
+
+        _GOOGLE_URL_CACHE[raw] = resolved
+        if not resolved:
+            print(f"[warn] Google News did not return a publisher URL for {article_id[:18]}.")
+        return resolved
     except Exception as exc:
-        print(f"[warn] cannot resolve publisher URL {raw}: {exc}")
-    return ""
+        print(f"[warn] cannot decode Google News URL {raw[:100]}: {exc}")
+        _GOOGLE_URL_CACHE[raw] = ""
+        return ""
 
 
 
