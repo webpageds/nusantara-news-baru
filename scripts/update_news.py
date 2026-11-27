@@ -161,43 +161,132 @@ class _MetaImageParser(HTMLParser):
                 yield candidate
 
 
+class _PublisherLinkParser(HTMLParser):
+    """Find canonical publisher article links inside Google News wrappers."""
+    def __init__(self):
+        super().__init__()
+        self.candidates: list[tuple[int, str]] = []
+
+    def handle_starttag(self, tag, attrs):
+        values = {str(k).lower(): str(v) for k, v in attrs if k and v}
+        tag = tag.lower()
+        if tag == "meta":
+            key = (values.get("property") or values.get("name") or "").lower()
+            if key in ("og:url", "twitter:url"):
+                value = values.get("content", "").strip()
+                if value:
+                    self.candidates.append((0, value))
+        elif tag == "link":
+            if "canonical" in (values.get("rel") or "").lower().split():
+                value = values.get("href", "").strip()
+                if value:
+                    self.candidates.append((1, value))
+        elif tag == "a":
+            value = values.get("href", "").strip()
+            if value.startswith(("https://", "http://")):
+                self.candidates.append((2, value))
+
+
+_TRACKING_HOSTS = (
+    "google-analytics.com", "googletagmanager.com", "googlesyndication.com",
+    "doubleclick.net", "adservice.google.com", "hotjar.com",
+)
+
+
+def _is_tracking_or_google_host(host: str, path: str = "") -> bool:
+    host = (host or "").lower().split(":", 1)[0]
+    path = (path or "").lower()
+    if any(host == item or host.endswith("." + item) for item in _TRACKING_HOSTS):
+        return True
+    if host in ("news.google.com", "google.com", "www.google.com", "gstatic.com"):
+        return True
+    if host.endswith((".google.com", ".gstatic.com", ".googleusercontent.com")):
+        return True
+    if path.endswith(("/analytics.js", "/gtag/js", "/gtm.js", "/collect", "/g/collect")):
+        return True
+    if any(token in path for token in ("/pagead/", "/doubleclick/", "/pixel.", "/beacon")):
+        return True
+    return False
+
+
+def _publisher_candidate(value: str, base_url: str = "") -> str:
+    """Normalize a candidate and reject trackers, Google wrappers, and static assets."""
+    try:
+        candidate = urllib.parse.urljoin(base_url, html.unescape(str(value or "")).strip())
+        parts = urllib.parse.urlsplit(candidate)
+        host, path = (parts.hostname or "").lower(), parts.path.lower()
+        if parts.scheme not in ("http", "https") or not host:
+            return ""
+        if _is_tracking_or_google_host(host, path):
+            return ""
+        if path.endswith((".js", ".css", ".json", ".xml", ".svg", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".woff", ".woff2")):
+            return ""
+        if not path or path == "/":
+            return ""
+        return urllib.parse.urlunsplit(("https", parts.netloc, parts.path, parts.query, ""))
+    except Exception:
+        return ""
+
+
 def resolve_publisher_url(url: str) -> str:
-    """Resolve Google News RSS links to the publisher article URL."""
-    if not url.startswith(("https://", "http://")):
+    """Resolve Google News RSS URLs without mistaking analytics assets for articles."""
+    raw = html.unescape(str(url or "")).strip()
+    if not raw.startswith(("https://", "http://")):
         return ""
     try:
-        parts = urllib.parse.urlsplit(url)
-        if parts.netloc.lower().endswith("news.google.com"):
-            # Google News article links sometimes encode the publisher URL in
-            # the RSS wrapper; otherwise, follow the redirect normally.
-            query = urllib.parse.parse_qs(parts.query)
-            for key in ("url", "u", "q"):
-                value = (query.get(key) or [""])[0]
-                if value.startswith(("https://", "http://")) and "google." not in urllib.parse.urlsplit(value).netloc.lower():
-                    return value
-        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (compatible; NusantaraNewsBot/1.0)"})
-        with urllib.request.urlopen(req, timeout=15) as response:
+        parts = urllib.parse.urlsplit(raw)
+        host = (parts.hostname or "").lower()
+        if _is_tracking_or_google_host(host, parts.path) and not host.endswith("news.google.com"):
+            return ""
+
+        # Direct publisher URLs should not need a Google redirect lookup.
+        if not host.endswith("news.google.com"):
+            return _publisher_candidate(raw)
+
+        query = urllib.parse.parse_qs(parts.query)
+        for key in ("url", "u", "q"):
+            value = (query.get(key) or [""])[0]
+            candidate = _publisher_candidate(value)
+            if candidate:
+                return candidate
+
+        req = urllib.request.Request(raw, headers={
+            "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/128 Safari/537.36",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        })
+        with urllib.request.urlopen(req, timeout=12) as response:
             final_url = response.geturl()
-            html_bytes = response.read(500000)
-        host = urllib.parse.urlsplit(final_url).netloc.lower()
-        if not host.endswith(("news.google.com", "google.com")):
-            return final_url
-        # Some Google News wrappers expose the original article link in HTML.
-        text = html_bytes.decode("utf-8", errors="replace")
-        patterns = [
-            r'https?://[^"\\\\ ]+',
-            r'url=([^&"\\\\ ]+)',
-        ]
+            content_type = str(response.headers.get("Content-Type", "")).lower()
+            if "html" not in content_type and "xml" not in content_type:
+                return _publisher_candidate(final_url)
+            html_bytes = response.read(1200000)
+
+        direct = _publisher_candidate(final_url)
+        if direct:
+            return direct
+
+        page = html_bytes.decode("utf-8", errors="replace")
+        parser = _PublisherLinkParser()
+        parser.feed(page)
+        for _, candidate in sorted(parser.candidates, key=lambda item: item[0]):
+            resolved = _publisher_candidate(candidate, final_url)
+            if resolved:
+                return resolved
+
+        patterns = (
+            r'https?://[^"\\s<>]+',
+            r'(?:url|href|canonical)\s*[:=]\s*["\'](https?://[^"\']+)',
+        )
         for pattern in patterns:
-            for match in re.findall(pattern, text):
-                candidate = urllib.parse.unquote(html.unescape(match)).replace("\\\\u003d", "=")
-                if candidate.startswith(("https://", "http://")):
-                    c_host = urllib.parse.urlsplit(candidate).netloc.lower()
-                    if c_host and not c_host.endswith(("google.com", "googleusercontent.com", "gstatic.com")):
-                        return candidate
+            for match in re.findall(pattern, page, flags=re.I):
+                candidate = urllib.parse.unquote(html.unescape(match)).replace("\\u0026", "&").replace("\\u003d", "=")
+                resolved = _publisher_candidate(candidate, final_url)
+                if resolved:
+                    return resolved
     except Exception as exc:
-        print(f"[warn] cannot resolve publisher URL {url}: {exc}")
+        print(f"[warn] cannot resolve publisher URL {raw}: {exc}")
     return ""
+
 
 
 def valid_article_image(url: str) -> bool:
@@ -222,9 +311,12 @@ def valid_article_image(url: str) -> bool:
         # dedicated Blogger CDN is allowed as a direct Google-hosted image.
         if host.endswith(("google.com", "gstatic.com", "googleusercontent.com")) and not blogger_host:
             return False
+        if host == "images.unsplash.com":
+            # The old feed used these as repeated category fallbacks, not article photos.
+            return False
         if any(token in path for token in (
             "logo", "favicon", "avatar", "placeholder", "no-image",
-            "no_image", "default-image", "default_image", "sprite"
+            "no_image", "default-image", "default_image", "sprite", "analytics.js"
         )):
             return False
         if re.search(r"(?:[?&](?:w|width|sz)=|[=/]w)(\d{1,4})(?:[&#/]|$)", raw.lower()):
@@ -239,19 +331,21 @@ def valid_article_image(url: str) -> bool:
 
 
 def image_url_is_reachable(url: str) -> bool:
-    """Check that the candidate URL really serves image bytes, not an HTML page."""
+    """Verify image bytes without relying on HTTP Range support."""
     try:
         req = urllib.request.Request(url, headers={
             "User-Agent": "Mozilla/5.0 (compatible; NusantaraNewsBot/1.0)",
             "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*;q=0.8,*/*;q=0.5",
-            "Range": "bytes=0-2047",
         })
         with urllib.request.urlopen(req, timeout=8) as response:
             content_type = str(response.headers.get("Content-Type", "")).lower()
-            if not content_type.startswith("image/"):
-                return False
             sample = response.read(32)
-            return bool(sample)
+            signature = (
+                sample.startswith(b"\\xff\\xd8\\xff")
+                or sample.startswith(b"\\x89PNG\\r\\n\\x1a\\n")
+                or sample.startswith((b"GIF87a", b"GIF89a", b"RIFF"))
+            )
+            return bool(sample) and (content_type.startswith("image/") or signature)
     except Exception:
         return False
 
@@ -283,15 +377,21 @@ def publisher_page_image(url: str) -> str | None:
     return None
 
 def item_image(item: ET.Element, article_url: str = "") -> str | None:
-    """Use the publisher's primary article image only; never a category stock image."""
+    """Use a reachable publisher-declared image, never a Google proxy thumbnail."""
     publisher_url = resolve_publisher_url(article_url) if article_url else ""
     if publisher_url:
         image = publisher_page_image(publisher_url)
         if image:
             return image
 
-    # Do not fall back to Google News RSS thumbnails: they can be generic or
-    # repeated editorial illustrations that have no relation to the story.
+    # RSS enclosures from the publisher/CDN are acceptable; Google-hosted
+    # News thumbnails are excluded because they can be generic or repetitive.
+    for elem in item.iter():
+        tag = elem.tag.lower()
+        if tag.endswith("}content") or tag.endswith("enclosure"):
+            candidate = (elem.attrib.get("url") or elem.attrib.get("href") or "").strip()
+            if valid_article_image(candidate) and image_url_is_reachable(candidate):
+                return candidate
     return None
 
 def request_feed(query: str) -> list[ET.Element]:
@@ -318,11 +418,28 @@ def main() -> int:
     candidates: list[dict] = []
     now = dt.datetime.now(TZ)
 
-    # Repair imported cards in batches; re-check every feed photo because some
-    # old entries point to Google News proxy thumbnails shared across stories.
+    # Delete the old category-based stock photos and Google News proxy thumbnails.
+    # These assets were reused across hundreds of unrelated stories.
     repaired = 0
+    for article in rows:
+        if not article.get("autoImported"):
+            continue
+        image = str(article.get("image") or "").strip()
+        image_host = (urllib.parse.urlsplit(image).hostname or "").lower() if image else ""
+        if image_host in ("images.unsplash.com", "lh3.googleusercontent.com"):
+            article["image"] = ""
+            article["caption"] = "Foto utama penerbit sedang dicari ulang; foto generik tidak digunakan."
+            repaired += 1
+        source_url = str(article.get("sourceUrl") or "").strip()
+        if source_url:
+            parts = urllib.parse.urlsplit(source_url)
+            if _is_tracking_or_google_host(parts.hostname or "", parts.path) and not (parts.hostname or "").lower().endswith("news.google.com"):
+                article["sourceUrl"] = ""
+                repaired += 1
+
     repair_cursor = next((int(article.get("_imageRepairCursor", 0)) for article in rows if article.get("_imageRepairCursor") is not None), 0)
     imported_indexes = [i for i, article in enumerate(rows) if article.get("autoImported")]
+    next_cursor = repair_cursor
     if imported_indexes:
         batch = imported_indexes[repair_cursor:repair_cursor + MAX_REPAIR_PER_RUN]
         if not batch:
@@ -330,25 +447,18 @@ def main() -> int:
             repair_cursor = 0
         for index in batch:
             article = rows[index]
-            source_url = str(article.get("sourceUrl") or "")
+            source_url = str(article.get("sourceUrl") or "").strip()
             if not source_url:
                 continue
             actual_image = publisher_page_image(source_url)
             existing_image = str(article.get("image") or "").strip()
             if actual_image and existing_image != actual_image:
                 article["image"] = actual_image
-                article["caption"] = f"Foto artikel dari penerbit {article.get('sourceName', 'sumber berita')}; kredit mengikuti sumber asli."
-                repaired += 1
-            elif not actual_image and existing_image and not valid_article_image(existing_image):
-                # Remove known proxy thumbnails or broken placeholders only.
-                # Keep existing direct publisher images when the source temporarily
-                # blocks our metadata fetch, so a transient network issue cannot erase a good photo.
-                article["image"] = ""
-                article["caption"] = "Foto asli belum dapat diverifikasi dari penerbit; gambar tidak ditampilkan sementara."
+                article["caption"] = f"Foto utama dari penerbit {article.get('sourceName', 'sumber berita')}; kredit mengikuti sumber asli."
                 repaired += 1
         next_cursor = (repair_cursor + len(batch)) % max(1, len(imported_indexes))
     if repaired:
-        print(f"Repaired {repaired} existing article image(s).")
+        print(f"Cleaned/repaired {repaired} imported article image/source field(s).")
 
     for category, query in FEEDS.items():
         try:
@@ -362,14 +472,27 @@ def main() -> int:
             source_name = clean_text(source_elem.text or "") if source_elem is not None else "Google News RSS"
             if source_name and raw_title.endswith(" - " + source_name):
                 raw_title = raw_title[:-(len(source_name) + 3)].strip()
-            link = (item.findtext("link") or "").strip()
-            if not raw_title or not link.startswith("https://"):
+            rss_link = (item.findtext("link") or "").strip()
+            if not raw_title or not rss_link.startswith(("https://", "http://")):
                 continue
-            publisher_link = resolve_publisher_url(link)
-            if publisher_link:
-                link = publisher_link
+            publisher_link = resolve_publisher_url(rss_link)
+            link = publisher_link or rss_link
             normalized = re.sub(r"\W+", " ", raw_title.lower()).strip()
+
+            # Re-match already imported titles to current RSS entries. This
+            # restores publisher URLs and hero images for records whose sourceUrl
+            # was previously corrupted to google-analytics.js.
             if normalized in known_titles:
+                existing = next((a for a in rows if re.sub(r"\W+", " ", str(a.get("title", "")).lower()).strip() == normalized and a.get("autoImported")), None)
+                if existing:
+                    if publisher_link and existing.get("sourceUrl") != publisher_link:
+                        existing["sourceUrl"] = publisher_link
+                        repaired += 1
+                    actual_image = item_image(item, publisher_link or rss_link)
+                    if actual_image and existing.get("image") != actual_image:
+                        existing["image"] = actual_image
+                        existing["caption"] = f"Foto utama dari penerbit {source_name}; kredit mengikuti sumber asli."
+                        repaired += 1
                 continue
             published = parse_date(item.findtext("pubDate") or "")
             if published > now + dt.timedelta(minutes=10) or published < now - dt.timedelta(hours=30):
@@ -389,7 +512,7 @@ def main() -> int:
                 suffix += 1
             known_titles.add(normalized)
             known_slugs.add(slug)
-            image = item_image(item, link)
+            image = item_image(item, publisher_link or rss_link)
             caption = f"Foto dari penerbit {source_name}; periksa kredit pada artikel asli." if image else "Foto asli dari penerbit belum dapat diverifikasi; gambar tidak ditampilkan."
             fallback_image = None
             candidates.append({
