@@ -21,13 +21,31 @@ ROOT = Path(__file__).resolve().parents[1]
 NEWS_PATH = ROOT / "data" / "news.json"
 TZ = ZoneInfo("Asia/Jakarta")
 MAX_NEW_PER_RUN = 5
-MAX_REPAIR_PER_RUN = 10
+MAX_REPAIR_PER_RUN = 20
 MAX_GOOGLE_URL_RESOLUTIONS_PER_RUN = 1
 _GOOGLE_URL_RESOLUTION_COUNT = 0
 _GOOGLE_URL_CACHE: dict[str, str] = {}
 
 # Source-verified article media for the exact items visible in the homepage report.
 PINNED_ARTICLE_MEDIA = {
+    "tokenisasi-saham-cara-kerja-contoh-dan-risikonya": {
+        "sourceName": "Gotrade Indonesia",
+        "sourceUrl": "https://www.heygotrade.com/id/edukasi/tokenisasi-saham/",
+        "image": "https://www.heygotrade.com/static/covers/fa9f4f3c3204d70c.webp",
+        "caption": "Sampul edukasi tokenisasi saham dari Gotrade Indonesia",
+    },
+    "apa-itu-market-crash-penyebab-dampak-dan-cara-menghadapinya": {
+        "sourceName": "Gotrade Indonesia",
+        "sourceUrl": "https://www.heygotrade.com/id/edukasi/apa-itu-market-crash/",
+        "image": "https://www.heygotrade.com/static/covers/43e8ee14ba33042a.webp",
+        "caption": "Sampul edukasi market crash dari Gotrade Indonesia",
+    },
+    "dana-gandeng-dozn-dari-korea-perluas-bisnis-keuangan-digital": {
+        "sourceName": "JPNN.com",
+        "sourceUrl": "https://www.jpnn.com/news/dozn-dan-dana-jalin-kerja-sama-memajukan-inklusi-keuangan-di-indonesia",
+        "image": "https://cloud.jpnn.com/photo/arsip/normal/2026/11/23/dozn-dan-dana-mengumumkan-kemitraan-strategis-tersebut-pada-cari.jpg",
+        "caption": "Foto: DANA via JPNN.com — pengumuman kemitraan Dozn dan DANA di Singapore FinTech Festival 2026",
+    },
     "podsi-prioritaskan-persiapan-atlet-demi-tiket-olimpiade-los-angeles-2028": {
         "sourceName": "ANTARA News",
         "sourceUrl": "https://www.antaranews.com/berita/5881443/podsi-akan-fokus-persiapkan-atlet-jelang-kualifikasi-olimpiade",
@@ -65,23 +83,12 @@ FEEDS = {
     "Sosial": "sosial masyarakat bantuan Indonesia when:1d",
     "Lifestyle": "gaya hidup budaya kesehatan Indonesia when:1d",
 }
-# Topic-specific editorial illustrations are used only when the publisher has
-# no usable image. They are labelled as illustrations, not event photographs.
-FALLBACK_IMAGES = {
-    "Nasional": "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=1200&h=675&q=82",
-    "Daerah": "https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1200&h=675&q=82",
-    "Ekonomi": "https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=1200&h=675&q=82",
-    "Internasional": "https://images.unsplash.com/photo-1526778548025-fa2f459cd1b4?auto=format&fit=crop&w=1200&h=675&q=82",
-    "Politik": "https://images.unsplash.com/photo-1529107386315-e1a2ed48a620?auto=format&fit=crop&w=1200&h=675&q=82",
-    "Teknologi": "https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&h=675&q=82",
-    "Olahraga": "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?auto=format&fit=crop&w=1200&h=675&q=82",
-    "Pendidikan": "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=1200&h=675&q=82",
-    "Sosial": "https://images.unsplash.com/photo-1531206715517-5c0ba140b2b8?auto=format&fit=crop&w=1200&h=675&q=82",
-    "Lifestyle": "https://images.unsplash.com/photo-1490645935967-10de6ba17061?auto=format&fit=crop&w=1200&h=675&q=82",
-}
+# Do not substitute category stock photos. Articles without a publisher image
+# remain without a photo until an article-specific source image is found.
+FALLBACK_IMAGES = {}
 
 def choose_fallback_image(category: str) -> str:
-    return FALLBACK_IMAGES.get(str(category or "").strip(), FALLBACK_IMAGES["Nasional"])
+    return ""
 
 def clean_text(value: str) -> str:
     value = re.sub(r"<(script|style)\b[^>]*>.*?</\1>", " ", value or "", flags=re.I | re.S)
@@ -532,32 +539,25 @@ def main() -> int:
             if article.get("image") != image:
                 article["image"] = image
                 pinned_repaired += 1
+            article["imageIsIllustration"] = False
         else:
             article["image"] = ""
     if pinned_repaired:
         print(f"Applied {pinned_repaired} source-verified article photo(s).")
 
-    # Keep a visibly labelled category illustration on imported stories
-    # when no source photo can be retrieved. Never use Google proxy thumbnails.
+    # Remove reused generic stock illustrations and invalid Google thumbnails.
+    # Keep only article-specific publisher photos; never repeat a category image.
     repaired = 0
     for article in rows:
         if not article.get("autoImported"):
             continue
         image = str(article.get("image") or "").strip()
         image_host = (urllib.parse.urlsplit(image).hostname or "").lower() if image else ""
-        if image_host in ("lh3.googleusercontent.com", "www.w3.org", "w3.org"):
+        if image_host in ("images.unsplash.com", "lh3.googleusercontent.com", "www.w3.org", "w3.org"):
             article["image"] = ""
             article["imageIsIllustration"] = False
-            article["caption"] = "Foto utama penerbit sedang dicari ulang."
+            article["caption"] = "Foto spesifik dari penerbit sedang dicari ulang; foto stok kategori dihapus."
             repaired += 1
-        if not str(article.get("image") or "").strip():
-            category = str(article.get("category") or "Nasional")
-            illustration = choose_fallback_image(category)
-            if illustration:
-                article["image"] = illustration
-                article["imageIsIllustration"] = True
-                article["caption"] = "Ilustrasi editorial kategori " + category + "; bukan dokumentasi langsung peristiwa. Foto utama penerbit tidak tersedia."
-                repaired += 1
         source_url = str(article.get("sourceUrl") or "").strip()
         if source_url:
             parts = urllib.parse.urlsplit(source_url)
@@ -647,11 +647,8 @@ def main() -> int:
             known_titles.add(normalized)
             known_slugs.add(slug)
             image = item_image(item, publisher_link or rss_link)
-            caption = f"Foto dari penerbit {source_name}; periksa kredit pada artikel asli." if image else "Foto asli dari penerbit belum dapat diverifikasi; gambar tidak ditampilkan."
-            is_illustration = not bool(image)
-            if not image:
-                image = choose_fallback_image(category)
-                caption = "Ilustrasi editorial kategori " + category + "; bukan dokumentasi langsung peristiwa. Foto utama penerbit tidak tersedia."
+            caption = f"Foto spesifik dari penerbit {source_name}; kredit mengikuti artikel asli." if image else "Foto spesifik dari penerbit belum ditemukan; tidak diganti dengan foto kategori yang berulang."
+            is_illustration = False
             candidates.append({
                 "slug": slug,
                 "title": raw_title[:140],
