@@ -11,12 +11,15 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 from urllib.request import Request, urlopen
 
+from update_news import publisher_page_image
+
 ROOT = Path(__file__).resolve().parents[1]
 NEWS_PATH = ROOT / "data" / "news.json"
 OPINION_PATH = ROOT / "data" / "opinions.json"
 TEMPLATE_PATH = ROOT / "article.html"
 SITE_URL = os.environ.get("SITE_URL", "https://nusantaranewsidn.com").rstrip("/")
 SITEMAP_PATH = ROOT / "sitemap.xml"
+SUPABASE_IMAGES_PATH = ROOT / "data" / "supabase-article-images.json"
 
 def attr(value: str) -> str:
     return html.escape(str(value or ""), quote=True)
@@ -111,6 +114,10 @@ def fetch_supabase_articles() -> list[dict]:
         if not slug or row.get("status") != "published":
             continue
         stamp = str(row.get("published_at") or row.get("created_at") or "")
+        source_url = row.get("source_url") or row.get("sourceUrl") or ""
+        image_url = row.get("image_url") or row.get("image") or ""
+        if not image_url and source_url:
+            image_url = publisher_page_image(str(source_url)) or ""
         articles.append({
             "slug": slug,
             "title": row.get("title") or "NusantaraNews",
@@ -120,12 +127,12 @@ def fetch_supabase_articles() -> list[dict]:
             "author": row.get("author_name") or row.get("author") or "Redaksi NusantaraNews",
             "date": stamp[:10],
             "time": "",
-            "image": row.get("image_url") or row.get("image") or "",
+            "image": image_url,
             "caption": row.get("image_caption") or row.get("caption") or "",
             "imageUrls": (row.get("image_urls") if isinstance(row.get("image_urls"), list) else [])[:2],
             "imageCaptions": (row.get("image_captions") if isinstance(row.get("image_captions"), list) else [])[:2],
             "sourceName": row.get("source_name") or row.get("sourceName") or "",
-            "sourceUrl": row.get("source_url") or row.get("sourceUrl") or "",
+            "sourceUrl": source_url,
             "updated_at": row.get("updated_at") or row.get("published_at") or "",
             "status": "Published",
             "sourceSystem": "supabase",
@@ -194,6 +201,19 @@ def main() -> int:
             print(f"[warn] Could not read opinions.json: {exc}")
             opinion_rows = []
     supabase_rows = fetch_supabase_articles()
+    # The public homepage reads live Supabase rows in the browser. Publish a
+    # slug->verified-image map so it can show publisher photos even if image_url
+    # was left empty in the dashboard record.
+    if supabase_rows:
+        image_map = {
+            str(article["slug"]): str(article.get("image") or "")
+            for article in supabase_rows
+            if article.get("slug") and article.get("image")
+        }
+        SUPABASE_IMAGES_PATH.parent.mkdir(parents=True, exist_ok=True)
+        SUPABASE_IMAGES_PATH.write_text(json.dumps(image_map, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    elif not SUPABASE_IMAGES_PATH.exists():
+        SUPABASE_IMAGES_PATH.write_text("{}\n", encoding="utf-8")
     by_slug = {
         str(article.get("slug")): article
         for article in feed_rows
