@@ -283,20 +283,15 @@ def publisher_page_image(url: str) -> str | None:
     return None
 
 def item_image(item: ET.Element, article_url: str = "") -> str | None:
-    """Use only a verified image from the original publisher article."""
+    """Use the publisher's primary article image only; never a category stock image."""
     publisher_url = resolve_publisher_url(article_url) if article_url else ""
     if publisher_url:
         image = publisher_page_image(publisher_url)
         if image:
             return image
-    # RSS media metadata is accepted only when hosted by a publisher/CDN,
-    # never Google News, generic Google thumbnail services or stock providers.
-    for elem in item.iter():
-        tag = elem.tag.lower()
-        if tag.endswith("}content") or tag.endswith("}thumbnail") or tag.endswith("enclosure"):
-            candidate = (elem.attrib.get("url") or elem.attrib.get("href") or "").strip()
-            if valid_article_image(candidate) and image_url_is_reachable(candidate):
-                return candidate
+
+    # Do not fall back to Google News RSS thumbnails: they can be generic or
+    # repeated editorial illustrations that have no relation to the story.
     return None
 
 def request_feed(query: str) -> list[ET.Element]:
